@@ -98,8 +98,14 @@
                 // If no user is logged in (initial state or signed out), attempt sign-in
                 try {
                     if (initialAuthToken) {
+                        // FIX: Added logging and visual status update before the async call
+                        document.getElementById('userIdDisplay').textContent = `Token Sign-in Attempt...`; 
+                        console.log("Attempting sign-in with Custom Token...");
                         await signInWithCustomToken(auth, initialAuthToken);
                     } else {
+                        // FIX: Added logging and visual status update before the async call
+                        document.getElementById('userIdDisplay').textContent = `Anonymous Sign-in Attempt...`;
+                        console.log("Attempting Anonymous sign-in (no custom token available)...");
                         // This is the path for the publicly hosted app (GitHub Pages)
                         await signInAnonymously(auth); 
                         // The successful sign-in will trigger onAuthStateChanged again with a user object
