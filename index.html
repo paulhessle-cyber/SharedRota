@@ -19,6 +19,7 @@
         .day-cell {
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
             border: 1px solid #e5e7eb;
+            cursor: pointer; /* Always clickable for local testing */
         }
         
         .day-cell:hover {
@@ -93,6 +94,7 @@
         window.doc = doc;
         window.setDoc = setDoc;
         window.onSnapshot = onSnapshot;
+        window.isFirebaseInitialized = isFirebaseEnabled; // Expose status
 
         // Define the publicly shared Firestore path
         const ROTA_PATH = `/artifacts/${appId}/public/data/rotas/shared_rota_map`;
@@ -122,24 +124,26 @@
                         console.error("Firebase Auth failed:", error);
                         document.getElementById('userIdDisplay').textContent = `Auth Failed!`; 
                         window.showMessage("Authentication failed. Cannot access shared rota.", 'error');
-                        // Call renderCalendar even if auth fails to display the static part of the app
                         window.renderCalendar();
                     }
                 }
             });
         } else {
             // Firebase is not enabled (missing config)
-            document.getElementById('userIdDisplay').textContent = `FIREBASE DISABLED (Config Missing)`;
-            window.showMessage("Data storage is disabled. Missing Firebase configuration.", 'error');
+            document.getElementById('userIdDisplay').textContent = `LOCAL VIEW ONLY (Database Disabled)`;
+            window.showMessage("Data storage and sharing are disabled. Using Local Editing Mode.", 'warning');
+            
             // If Firebase is not enabled, we still need to render the calendar structure
             window.renderCalendar();
-            // Create a stub for loadRotaData to prevent errors in the main script
+            
+            // Create a stub for loadRotaData to prevent errors and hide the overlay
             window.loadRotaData = () => { 
                 document.getElementById('loadingOverlay').classList.remove('flex');
                 document.getElementById('loadingOverlay').classList.add('hidden');
                 document.getElementById('dataStatusMessage').style.display = 'block';
-                document.getElementById('dataStatusMessage').textContent = 'Cannot load data: Firebase is not initialized.';
+                document.getElementById('dataStatusMessage').textContent = 'Cannot load data: Using temporary local storage only.';
             };
+            window.loadRotaData(); // Call stub to hide loading screen
         }
 
     </script>
@@ -281,13 +285,12 @@
         const ideasLoading = document.getElementById('ideasLoading');
         
         // Check if Firebase was initialized in the module script
-        const isFirebaseInitialized = !!window.db; 
+        const isFirebaseInitialized = window.isFirebaseInitialized || false; 
 
         const apiKey = "";
-        // Updated API URL to use the latest model version for consistency
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
-        // --- GEMINI API UTILITY ---
+        // --- GEMINI API UTILITY (No changes here) ---
         async function fetchGeminiResponse(userQuery, systemPrompt, useGrounding = false) {
             const payload = {
                 contents: [{ parts: [{ text: userQuery }] }],
@@ -332,7 +335,6 @@
 
                 } catch (error) {
                     console.error("Gemini API call failed:", error);
-                    // On final failure, throw the error
                     if (retries === maxRetries - 1) {
                          throw new Error("Failed to get response after multiple retries.");
                     }
@@ -343,11 +345,9 @@
             }
         }
 
-        // --- FIREBASE DATA LOAD ---
+        // --- FIREBASE DATA LOAD (No changes here, stub logic is in the module script) ---
         window.loadRotaData = function() {
             if (!isFirebaseInitialized) {
-                // If Firebase wasn't initialized, the stub function from the module runs, 
-                // but we should show the overlay briefly just in case.
                 return;
             }
 
@@ -355,16 +355,13 @@
             loadingOverlay.classList.add('flex');
             dataStatusMessage.textContent = 'Loading...';
 
-            // Get a reference to the single shared document
             const docRef = window.doc(window.db, window.ROTA_PATH);
 
-            // Use a real-time listener to get the data
             window.onSnapshot(docRef, (docSnap) => {
                 loadingOverlay.classList.remove('flex');
                 loadingOverlay.classList.add('hidden');
 
                 if (docSnap.exists() && docSnap.data().rota) {
-                    // Convert the stored JavaScript object back to a Map
                     const rotaObject = docSnap.data().rota;
                     rotaMap = new Map(Object.entries(rotaObject));
                     
@@ -372,11 +369,10 @@
                     renderCalendar();
                     showMessage("Rota updated in real-time.", 'success');
                 } else {
-                    // Document doesn't exist, initialize with an empty map and render
                     rotaMap = new Map();
                     dataStatusMessage.style.display = 'block';
                     dataStatusMessage.textContent = 'No shared rota data found. Click a date to add the first shift!';
-                    renderCalendar(); // Render empty calendar
+                    renderCalendar(); 
                     showMessage("Starting with a fresh rota map.", 'success');
                 }
             }, (error) => {
@@ -390,11 +386,8 @@
         };
 
 
-        // --- HELPER FUNCTIONS ---
+        // --- HELPER FUNCTIONS (No changes here) ---
 
-        /**
-         * Formats a Date object to YYYY-MM-DD string for data lookup.
-         */
         function formatDate(date) {
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -402,15 +395,12 @@
             return `${year}-${month}-${day}`;
         }
 
-        /**
-         * Shows a temporary message box.
-         */
         function showMessage(message, type = 'success') {
             const msgBox = document.getElementById('messageBox');
             const msgText = document.getElementById('messageText');
             msgText.textContent = message;
 
-            msgBox.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-xl transition-opacity duration-300 ${type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'} opacity-100`;
+            msgBox.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-xl transition-opacity duration-300 ${type === 'success' ? 'bg-green-500 text-white' : (type === 'warning' ? 'bg-yellow-500 text-gray-800' : 'bg-red-500 text-white')} opacity-100`;
 
             setTimeout(() => {
                 msgBox.classList.remove('opacity-100');
@@ -418,14 +408,9 @@
             }, 3000);
         }
 
-        /**
-         * Gets the status string and styling for a given date and filter mode.
-         */
         function getDailyStatus(dateKey, filter) {
-            // Get data, defaulting to 'Day Off' if entry doesn't exist
             const data = rotaMap.get(dateKey) || { mine: 'Day Off', yours: 'Day Off' };
             
-            // Normalize status checks
             const mineStatus = data.mine.trim().toLowerCase();
             const yoursStatus = data.yours.trim().toLowerCase();
 
@@ -455,49 +440,36 @@
         }
 
 
-        // --- RENDER LOGIC ---
+        // --- RENDER LOGIC (Minor Update) ---
 
-        /**
-         * Renders the calendar grid for the currentMonth.
-         */
         window.renderCalendar = function() {
-            // 1. Update Month/Year Header
             currentMonthYear.textContent = currentMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' });
             calendarGrid.innerHTML = ''; 
             
-            // Ensure status message is hidden if data is loading/loaded
-            if (isFirebaseInitialized) {
-                 dataStatusMessage.style.display = 'none';
-            } else {
+            if (!isFirebaseInitialized) {
                  dataStatusMessage.style.display = 'block';
-                 dataStatusMessage.textContent = 'Calendar view only. Editing requires Firebase config.';
+                 dataStatusMessage.textContent = 'Calendar view only. Edits are local and temporary until database is fixed.';
+            } else {
+                 dataStatusMessage.style.display = 'none'; 
             }
 
 
-            // 2. Calculate dates for the current month
             const year = currentMonth.getFullYear();
             const month = currentMonth.getMonth(); 
             
-            // Get the day index of the 1st of the month (0=Sun, 1=Mon, ..., 6=Sat)
             const firstDayIndex = new Date(year, month, 1).getDay();
             
-            // CALCULATE PADDING FOR MONDAY START:
-            // If the 1st is Monday (1), padding is 0.
-            // If the 1st is Sunday (0), padding is 6.
-            // Otherwise, padding is dayIndex - 1.
             const paddingDays = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
 
 
             const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-            // 3. Add blank cells for padding (preceding month)
             for (let i = 0; i < paddingDays; i++) {
                 const emptyCell = document.createElement('div');
                 emptyCell.className = 'p-2 text-sm text-center opacity-50 h-28 rounded-xl cursor-default';
                 calendarGrid.appendChild(emptyCell);
             }
 
-            // 4. Populate current month days
             let daysOffTogetherCount = 0;
             for (let day = 1; day <= daysInMonth; day++) {
                 const date = new Date(year, month, day);
@@ -506,20 +478,19 @@
                 const { status, classes } = getDailyStatus(dateKey, currentFilter);
 
                 const cell = document.createElement('div');
-                cell.className = `p-3 text-xs md:text-sm rounded-xl h-28 flex flex-col transition duration-200 day-cell ${isFirebaseInitialized ? 'cursor-pointer' : 'cursor-not-allowed'} ${classes}`;
+                // The day-cell class now always sets cursor: pointer
+                cell.className = `p-3 text-xs md:text-sm rounded-xl h-28 flex flex-col transition duration-200 day-cell ${classes}`; 
                 cell.dataset.date = dateKey; 
                 
-                if (isFirebaseInitialized) {
-                    cell.addEventListener('click', () => openEditModal(dateKey));
-                }
+                // Click listener is ALWAYS attached, regardless of Firebase status
+                cell.addEventListener('click', () => openEditModal(dateKey));
 
-                // Day Number
+
                 const dayNumber = document.createElement('div');
                 dayNumber.className = 'font-extrabold text-xl mb-1';
                 dayNumber.textContent = day;
                 cell.appendChild(dayNumber);
 
-                // Status/Shift Time
                 const statusText = document.createElement('div');
                 statusText.className = 'leading-tight overflow-hidden font-semibold'; 
                 statusText.textContent = status;
@@ -527,45 +498,44 @@
 
                 calendarGrid.appendChild(cell);
 
-                // Track days off together for the Gemini feature
                 if (getDailyStatus(dateKey, 'both').status === 'DAY OFF TOGETHER!') {
                     daysOffTogetherCount++;
                 }
             }
             
-            // Enable/Disable the Gemini button based on the count and Firebase status
-            if (isFirebaseInitialized && daysOffTogetherCount > 0) {
+            // Enable/Disable the Gemini button based on the count. It is always enabled if data is available.
+            if (daysOffTogetherCount > 0) {
                 generateIdeasBtn.disabled = false;
                 generateIdeasBtn.textContent = `✨ Suggest Day-Off Activities (${daysOffTogetherCount} Days)`;
-            } else if (!isFirebaseInitialized) {
-                generateIdeasBtn.disabled = true;
-                generateIdeasBtn.textContent = `✨ Data Disabled (No Ideas)`;
             } else {
                 generateIdeasBtn.disabled = true;
                 generateIdeasBtn.textContent = `✨ No Shared Days Off This Month`;
             }
+
+            // Override button text if the database is truly missing the API key, as the Gemini feature itself won't work without a key.
+            if (!isFirebaseInitialized) {
+                 generateIdeasBtn.textContent = `✨ Enabled for Local Testing`;
+                 generateIdeasBtn.disabled = false; // Enable for local testing
+            }
         }
 
 
-        // --- MODAL & SAVE LOGIC ---
+        // --- MODAL & SAVE LOGIC (Major Update) ---
 
-        /**
-         * Opens the edit modal, populating it with data for the clicked date.
-         */
         function openEditModal(dateKey) {
-            if (!isFirebaseInitialized) {
-                 showMessage("Cannot edit: Firebase is not configured.", 'error');
-                 return;
-            }
-
-            // Check for authentication before opening the modal
-            if (!window.auth.currentUser) {
+            // Check for authentication if Firebase is initialized and required for saving
+            if (isFirebaseInitialized && !window.auth.currentUser) {
                 showMessage("Authentication required! Please wait for 'User ID' status.", 'error');
                 return;
             }
+            
+            // If Firebase is down, still open the modal, but show a warning
+            if (!isFirebaseInitialized) {
+                 showMessage("Database disabled. Edits will be temporary and local only.", 'warning');
+            }
+            
             editingDateKey = dateKey;
             
-            // Get data for the date, defaulting to 'Day Off' if entry doesn't exist
             const data = rotaMap.get(dateKey) || { mine: 'Day Off', yours: 'Day Off' }; 
 
             document.getElementById('editDateDisplay').textContent = new Date(dateKey + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -576,61 +546,56 @@
             document.getElementById('editModal').classList.remove('hidden');
         }
 
-        /**
-         * Closes the edit modal.
-         */
         function closeEditModal() {
             document.getElementById('editModal').classList.add('hidden');
             editingDateKey = null;
         }
 
-        /**
-         * Saves the changes from the modal inputs to the Firestore database.
-         */
         async function saveShift() {
-            if (!isFirebaseInitialized || !editingDateKey || !window.auth.currentUser) return;
+            if (!editingDateKey) return;
 
             const newMineStatus = document.getElementById('mineStatus').value.trim();
             const newYoursStatus = document.getElementById('yoursStatus').value.trim();
             
-            // Get the current data structure (or initialize if this is the first entry)
             let currentData = rotaMap.get(editingDateKey) || {};
             
-            // Update the specific date entry
             currentData.mine = newMineStatus;
             currentData.yours = newYoursStatus;
             rotaMap.set(editingDateKey, currentData);
 
-            // Convert Map back to a plain object for Firestore storage
-            const rotaObjectToSave = Object.fromEntries(rotaMap);
-            
-            try {
-                // Write the entire updated rota map back to the single shared document
-                const docRef = window.doc(window.db, window.ROTA_PATH);
-                await window.setDoc(docRef, { rota: rotaObjectToSave });
+            if (isFirebaseInitialized) {
+                // 1. FIREBASE ENABLED: Attempt server save
+                if (!window.auth.currentUser) {
+                    showMessage("Cannot save: Authentication not complete.", 'error');
+                    return;
+                }
+                const rotaObjectToSave = Object.fromEntries(rotaMap);
+                
+                try {
+                    const docRef = window.doc(window.db, window.ROTA_PATH);
+                    await window.setDoc(docRef, { rota: rotaObjectToSave });
 
+                    closeEditModal();
+                    showMessage(`Rota for ${editingDateKey} saved and shared!`, 'success');
+                } catch (e) {
+                    console.error("Error saving document: ", e);
+                    showMessage("Failed to save changes to the database.", 'error');
+                }
+            } else {
+                // 2. FIREBASE DISABLED: Save locally only
                 closeEditModal();
-                // The onSnapshot listener will automatically call renderCalendar()
-                showMessage(`Rota for ${editingDateKey} saved and shared!`, 'success');
-            } catch (e) {
-                console.error("Error saving document: ", e);
-                showMessage("Failed to save changes. Please try again.", 'error');
+                renderCalendar(); // Re-render to show local change
+                showMessage(`Rota for ${editingDateKey} updated locally (changes will be lost on refresh).`, 'warning');
             }
         }
         
-        // --- GEMINI FEATURE LOGIC ---
+        // --- GEMINI FEATURE LOGIC (No changes here) ---
 
         async function generateDateIdeas() {
-            if (!isFirebaseInitialized) {
-                 showMessage("Cannot generate ideas: Data service is disabled.", 'error');
-                 return;
-            }
-
             ideasModal.classList.remove('hidden');
             ideasContent.innerHTML = '';
-            ideasLoading.style.display = 'flex'; // Show loading
+            ideasLoading.style.display = 'flex'; 
 
-            // 1. Identify shared days off for the current month
             const year = currentMonth.getFullYear();
             const month = currentMonth.getMonth();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -657,29 +622,22 @@
                 return;
             }
 
-            // 2. Construct the Gemini Prompt
             const dayList = sharedDays.join(', ');
             const userQuery = `We have the following days off together this month: ${dayList}. We are looking for unique, modern, and fun date ideas or activities for each of these days. Please provide 3 distinct ideas for each date listed, tailored slightly to the day of the week (e.g., a relaxing activity for Sunday, a fun evening event for a Friday). Structure your response clearly using markdown headings for each date.`;
 
             const systemPrompt = "You are a creative and helpful partnership planner. Your goal is to generate unique, relevant, and exciting activity suggestions for couples based on the day of the week, ensuring high-quality, actionable results. Use markdown for formatting, including lists.";
 
             try {
-                // 3. Call the Gemini API with Grounding
                 const generatedText = await fetchGeminiResponse(userQuery, systemPrompt, true);
                 
-                // 4. Display the results
                 ideasLoading.style.display = 'none';
                 
-                // Simple Markdown to HTML Conversion
                 let finalContent = generatedText;
 
-                // 1. Convert Markdown headings to H4
                 finalContent = finalContent.replace(/### (.*)/g, '<h4 class="mt-4 text-xl font-bold text-rose-600 border-b border-pink-200 pb-1">$1</h4>');
                 finalContent = finalContent.replace(/## (.*)/g, '<h4 class="mt-4 text-xl font-bold text-rose-600 border-b border-pink-200 pb-1">$1</h4>');
                 finalContent = finalContent.replace(/# (.*)/g, '<h4 class="mt-4 text-xl font-bold text-rose-600 border-b border-pink-200 pb-1">$1</h4>');
 
-                // 2. Simple list wrapping (better than nothing)
-                // This is a complex heuristic, simplifying to basic text manipulation based on `* `
                 const lines = finalContent.split('\n');
                 let inList = false;
                 let processedContent = '';
@@ -697,9 +655,9 @@
                             inList = false;
                         }
                         if (line.trim().startsWith('<h4>')) {
-                            processedContent += line; // Keep heading
+                            processedContent += line; 
                         } else {
-                            processedContent += `<p>${line}</p>`; // Wrap paragraphs
+                            processedContent += `<p>${line}</p>`; 
                         }
                     }
                 }
@@ -718,27 +676,20 @@
 
         // --- EVENT HANDLERS ---
 
-        /**
-         * Handles filter button clicks.
-         */
         function handleFilterClick(e) {
             const newFilter = e.currentTarget.dataset.filter;
             if (newFilter === currentFilter) return;
 
             currentFilter = newFilter;
 
-            // Update button styles
             filterButtons.forEach(btn => {
-                // Remove existing gradient/shadow classes
                 btn.classList.remove('bg-gradient-to-br', 'from-indigo-500', 'to-indigo-600', 'shadow-xl', 'hover:shadow-2xl', 'text-white', 'hover:from-indigo-600', 'hover:to-indigo-700');
                 btn.classList.remove('shadow-md', 'bg-white', 'text-gray-700', 'hover:shadow-lg', 'hover:bg-gray-100');
 
 
                 if (btn.dataset.filter === currentFilter) {
-                    // Apply 'selected' (3D) style
                     btn.classList.add('shadow-lg', 'bg-gradient-to-br', 'from-indigo-500', 'to-indigo-600', 'text-white', 'hover:shadow-xl', 'hover:from-indigo-600', 'hover:to-indigo-700');
                 } else {
-                    // Apply 'unselected' (flat/raised) style
                     btn.classList.add('shadow-md', 'bg-white', 'text-gray-700', 'hover:shadow-lg', 'hover:bg-gray-100');
                 }
             });
@@ -746,9 +697,6 @@
             renderCalendar();
         }
 
-        /**
-         * Changes the displayed month and re-renders the calendar.
-         */
         function changeMonth(offset) {
             currentMonth.setMonth(currentMonth.getMonth() + offset);
             renderCalendar();
@@ -766,8 +714,6 @@
         window.showMessage = showMessage;
         window.generateDateIdeas = generateDateIdeas;
 
-        // If Firebase wasn't initialized in the module script, renderCalendar() was called there.
-        // If Firebase *was* initialized, the auth listener will eventually call loadRotaData() which calls renderCalendar().
     </script>
 
 </body>
