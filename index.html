@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Rota Calendar</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #eef2ff; /* Indigo-50 background */ }
+        
+        /* Custom CSS for 3D/Shadow effects */
+        .card-lift {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .day-cell {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e5e7eb;
+        }
+        
+        .day-cell:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(67, 56, 202, 0.3), 0 4px 6px -2px rgba(67, 56, 202, 0.1);
+            border-color: #6366f1; /* Indigo-500 */
+        }
+
+        /* Style for the 'Both' view which highlights days off together */
+        .day-off-together {
+            background-color: #10b981 !important; /* Tailwind emerald-500 */
+            color: white !important;
+            border-color: #059669 !important; /* Tailwind emerald-600 */
+            box-shadow: 0 8px 10px -5px rgba(16, 185, 129, 0.5) !important; /* Stronger shadow for pop */
+        }
+        
+        .loading-overlay {
+            background-color: rgba(255, 255, 255, 0.8);
+            z-index: 50;
+        }
+
+        /* Custom styles for generated content from LLM */
+        .llm-content h4 {
+            font-weight: bold;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            color: #ec4899; /* Pink-500 */
+            border-bottom: 2px solid #fbcfe8;
+            padding-bottom: 4px;
+        }
+        .llm-content ul {
+            list-style-type: disc;
+            margin-left: 1.5rem;
+            padding-left: 0;
+        }
+    </style>
+    <!-- Firebase SDK Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Initialize Firebase
+        setLogLevel('Debug');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Define the publicly shared Firestore path
+        const ROTA_PATH = `/artifacts/${appId}/public/data/rotas/shared_rota_map`;
+        
+        let localUserId = null;
+
+        // Global functions to be used in the script tag
+        window.db = db;
+        window.auth = auth;
+        window.ROTA_PATH = ROTA_PATH;
+        // EXPOSE CRITICAL FIRESTORE FUNCTIONS GLOBALLY FOR THE MAIN SCRIPT BLOCK
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.onSnapshot = onSnapshot;
+
+        // Authentication and User ID setup
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                localUserId = user.uid;
+                document.getElementById('userIdDisplay').textContent = `User ID: ${localUserId}`;
+                // Once authenticated, start loading data
+                window.loadRotaData();
+            } else {
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                        // User ID will be set by the onAuthStateChanged listener above
+                    }
+                } catch (error) {
+                    console.error("Firebase Auth failed:", error);
+                    window.showMessage("Authentication failed. Cannot access shared rota.", 'error');
+                }
+            }
+        });
+
+    </script>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay absolute inset-0 hidden items-center justify-center">
+        <div class="flex flex-col items-center p-6 bg-white rounded-lg shadow-2xl">
+            <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-3 text-indigo-600 font-semibold">Loading shared rota data...</p>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto bg-white card-lift rounded-2xl overflow-hidden">
+        
+        <!-- Header and Controls -->
+        <header class="p-4 md:p-6 bg-indigo-700 text-white flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 shadow-inner">
+            <h1 class="text-2xl font-extrabold tracking-tight">Shared Rota Viewer</h1>
+            <div id="userIdDisplay" class="text-xs opacity-75 truncate max-w-full">Connecting...</div>
+            
+            <!-- Navigation -->
+            <div class="flex space-x-2">
+                <button id="prevMonth" class="p-2 rounded-full bg-indigo-600 hover:bg-indigo-800 transition duration-150 shadow-md">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                </button>
+                <h2 id="currentMonthYear" class="text-xl font-bold w-32 text-center flex items-center justify-center"></h2>
+                <button id="nextMonth" class="p-2 rounded-full bg-indigo-600 hover:bg-indigo-800 transition duration-150 shadow-md">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Filter Buttons -->
+        <div class="p-4 border-b border-indigo-100 flex justify-center space-x-4 md:space-x-8 bg-indigo-50">
+            <button id="filterMine" data-filter="mine" class="filter-btn px-5 py-2 text-sm md:text-base font-bold rounded-full transition duration-200 shadow-lg bg-gradient-to-br from-indigo-500 to-indigo-600 text-white hover:shadow-xl hover:from-indigo-600 hover:to-indigo-700">Mine</button>
+            <button id="filterYours" data-filter="yours" class="filter-btn px-5 py-2 text-sm md:text-base font-bold rounded-full transition duration-200 shadow-md bg-white text-gray-700 hover:shadow-lg hover:bg-gray-100">Yours</button>
+            <button id="filterBoth" data-filter="both" class="filter-btn px-5 py-2 text-sm md:text-base font-bold rounded-full transition duration-200 shadow-md bg-white text-gray-700 hover:shadow-lg hover:bg-gray-100">Both</button>
+        </div>
+
+        <!-- Gemini Feature Button -->
+        <div class="p-4 flex justify-center border-b border-indigo-100 bg-indigo-50">
+            <button id="generateIdeasBtn" onclick="generateDateIdeas()" class="px-5 py-2 text-sm md:text-base font-bold rounded-full transition duration-200 shadow-xl bg-gradient-to-br from-pink-500 to-rose-600 text-white hover:shadow-2xl hover:from-pink-600 hover:to-rose-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                ✨ Suggest Day-Off Activities
+            </button>
+        </div>
+
+
+        <!-- Calendar Grid -->
+        <div class="p-2 md:p-6">
+            <!-- Day Names: Starts on Monday -->
+            <div class="grid grid-cols-7 gap-2 md:gap-3 text-center text-sm font-extrabold text-indigo-700 border-b border-indigo-200 pb-3 mb-3">
+                <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+            </div>
+            <!-- Calendar Cells -->
+            <div id="calendarGrid" class="grid grid-cols-7 gap-2 md:gap-3">
+                <div class="col-span-7 text-center py-8 text-gray-500" id="dataStatusMessage">Awaiting data...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Shift Modal -->
+    <div id="editModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-40 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 transform transition duration-300">
+            <h3 class="text-xl font-bold text-indigo-600 mb-2">Edit Rota for:</h3>
+            <p id="editDateDisplay" class="text-gray-700 mb-4 text-lg font-semibold"></p>
+            
+            <!-- Clarification for Mine/Yours -->
+            <div class="mb-4 p-3 text-sm bg-indigo-50 border border-indigo-200 rounded-lg">
+                <p class="font-semibold text-indigo-700">Remember:</p>
+                <p class="text-indigo-600">"My Shift (Mine)" is your schedule. "Partner's Shift (Yours)" is the other person's schedule.</p>
+            </div>
+            <!-- End Clarification -->
+
+            <div class="space-y-4">
+                <!-- My Shift -->
+                <div>
+                    <label for="mineStatus" class="block text-sm font-medium text-gray-700 mb-1">My Shift (Mine)</label>
+                    <input type="text" id="mineStatus" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 shadow-inner transition duration-150" placeholder="e.g., Work: 9am - 5pm or Day Off">
+                </div>
+                
+                <!-- Partner's Shift -->
+                <div>
+                    <label for="yoursStatus" class="block text-sm font-medium text-gray-700 mb-1">Partner's Shift (Yours)</label>
+                    <input type="text" id="yoursStatus" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 shadow-inner transition duration-150" placeholder="e.g., Work: 10am - 6pm or Day Off">
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-6 flex justify-end space-x-3">
+                <button onclick="closeEditModal()" class="px-5 py-2 bg-gray-300 text-gray-700 font-semibold rounded-full hover:bg-gray-400 transition duration-150 shadow-md">Cancel</button>
+                <button onclick="saveShift()" class="px-5 py-2 bg-gradient-to-br from-indigo-500 to-indigo-600 text-white font-semibold rounded-full shadow-xl hover:shadow-2xl hover:from-indigo-600 hover:to-indigo-700 transition duration-150">Save Changes</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Date Ideas Modal (Gemini Output) -->
+    <div id="ideasModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-40 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl p-6 transform transition duration-300">
+            <h3 class="text-2xl font-bold text-rose-600 mb-4 flex items-center">
+                ✨ Day-Off Activity Ideas
+            </h3>
+            <div id="ideasContent" class="text-gray-700 space-y-4 max-h-96 overflow-y-auto pr-2 llm-content">
+                <div class="flex flex-col items-center justify-center py-10" id="ideasLoading">
+                    <svg class="animate-spin h-6 w-6 text-rose-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span class="mt-3 font-semibold text-rose-500">Generating ideas...</span>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button onclick="document.getElementById('ideasModal').classList.add('hidden')" class="px-5 py-2 bg-gray-300 text-gray-700 font-semibold rounded-full hover:bg-gray-400 transition duration-150 shadow-md">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Custom Message Box (instead of alert) -->
+    <div id="messageBox" class="fixed top-4 right-4 z-50 p-4 rounded-lg shadow-xl transition-opacity duration-300 opacity-0 pointer-events-none" role="alert">
+        <p id="messageText" class="font-semibold"></p>
+    </div>
+
+    <script>
+        // Data structure to hold the entire rota map, loaded from Firestore
+        let rotaMap = new Map();
+
+        let currentFilter = 'mine'; 
+        let currentMonth = new Date();
+        let editingDateKey = null; 
+
+        const calendarGrid = document.getElementById('calendarGrid');
+        const currentMonthYear = document.getElementById('currentMonthYear');
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        const dataStatusMessage = document.getElementById('dataStatusMessage');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const generateIdeasBtn = document.getElementById('generateIdeasBtn');
+        const ideasContent = document.getElementById('ideasContent');
+        const ideasModal = document.getElementById('ideasModal');
+        const ideasLoading = document.getElementById('ideasLoading');
+
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        // --- GEMINI API UTILITY ---
+        async function fetchGeminiResponse(userQuery, systemPrompt, useGrounding = false) {
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+            
+            if (useGrounding) {
+                payload.tools = [{ "google_search": {} }];
+            }
+
+            let response;
+            let retries = 0;
+            const maxRetries = 5;
+            let delay = 1000;
+
+            while (retries < maxRetries) {
+                try {
+                    response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.status === 429) { // Too Many Requests
+                        retries++;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; // Exponential backoff
+                        continue;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (!text) {
+                        throw new Error("Gemini response was empty or malformed.");
+                    }
+                    return text;
+
+                } catch (error) {
+                    console.error("Gemini API call failed:", error);
+                    // On final failure, throw the error
+                    if (retries === maxRetries - 1) {
+                         throw new Error("Failed to get response after multiple retries.");
+                    }
+                    retries++;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2;
+                }
+            }
+        }
+
+        // --- FIREBASE DATA LOAD ---
+        window.loadRotaData = function() {
+            loadingOverlay.classList.remove('hidden');
+            loadingOverlay.classList.add('flex');
+            dataStatusMessage.textContent = 'Loading...';
+
+            // Get a reference to the single shared document
+            const docRef = window.doc(window.db, window.ROTA_PATH);
+
+            // Use a real-time listener to get the data
+            window.onSnapshot(docRef, (docSnap) => {
+                loadingOverlay.classList.remove('flex');
+                loadingOverlay.classList.add('hidden');
+
+                if (docSnap.exists() && docSnap.data().rota) {
+                    // Convert the stored JavaScript object back to a Map
+                    const rotaObject = docSnap.data().rota;
+                    rotaMap = new Map(Object.entries(rotaObject));
+                    
+                    dataStatusMessage.style.display = 'none';
+                    renderCalendar();
+                    showMessage("Rota updated in real-time.", 'success');
+                } else {
+                    // Document doesn't exist, initialize with an empty map and render
+                    rotaMap = new Map();
+                    dataStatusMessage.style.display = 'block';
+                    dataStatusMessage.textContent = 'No shared rota data found. Click a date to add the first shift!';
+                    renderCalendar(); // Render empty calendar
+                    showMessage("Starting with a fresh rota map.", 'success');
+                }
+            }, (error) => {
+                console.error("Error reading rota data:", error);
+                loadingOverlay.classList.remove('flex');
+                loadingOverlay.classList.add('hidden');
+                dataStatusMessage.style.display = 'block';
+                dataStatusMessage.textContent = 'Error loading data. Check console for details.';
+                showMessage("Failed to load shared data.", 'error');
+            });
+        };
+
+
+        // --- HELPER FUNCTIONS ---
+
+        /**
+         * Formats a Date object to YYYY-MM-DD string for data lookup.
+         */
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        /**
+         * Shows a temporary message box.
+         */
+        function showMessage(message, type = 'success') {
+            const msgBox = document.getElementById('messageBox');
+            const msgText = document.getElementById('messageText');
+            msgText.textContent = message;
+
+            msgBox.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-xl transition-opacity duration-300 ${type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'} opacity-100`;
+
+            setTimeout(() => {
+                msgBox.classList.remove('opacity-100');
+                msgBox.classList.add('opacity-0');
+            }, 3000);
+        }
+
+        /**
+         * Gets the status string and styling for a given date and filter mode.
+         */
+        function getDailyStatus(dateKey, filter) {
+            // Get data, defaulting to 'Day Off' if entry doesn't exist
+            const data = rotaMap.get(dateKey) || { mine: 'Day Off', yours: 'Day Off' };
+            
+            // Normalize status checks
+            const mineStatus = data.mine.trim().toLowerCase();
+            const yoursStatus = data.yours.trim().toLowerCase();
+
+            const isDayOffTogether = mineStatus === 'day off' && yoursStatus === 'day off';
+
+            if (filter === 'both') {
+                if (isDayOffTogether) {
+                    return { status: 'DAY OFF TOGETHER!', classes: 'day-off-together' };
+                }
+                return { status: 'Working/Separate', classes: 'bg-gray-200 text-gray-500 shadow-inner' };
+            }
+
+            const status = data[filter];
+            let classes = 'text-gray-700 bg-white';
+            
+            if (status.trim().toLowerCase() === 'day off') {
+                classes = 'text-emerald-700 bg-emerald-100 font-medium';
+            } else if (status.trim().toLowerCase().startsWith('work:')) {
+                classes = 'text-indigo-700 bg-indigo-100 font-medium';
+            }
+
+            if (isDayOffTogether) {
+                 classes += ' border-2 border-emerald-400';
+            }
+
+            return { status, classes };
+        }
+
+
+        // --- RENDER LOGIC ---
+
+        /**
+         * Renders the calendar grid for the currentMonth.
+         */
+        function renderCalendar() {
+            // 1. Update Month/Year Header
+            currentMonthYear.textContent = currentMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            calendarGrid.innerHTML = ''; 
+            
+            // Ensure status message is hidden if data is loading/loaded
+            dataStatusMessage.style.display = 'none';
+
+            // 2. Calculate dates for the current month
+            const year = currentMonth.getFullYear();
+            const month = currentMonth.getMonth(); 
+            
+            // Get the day index of the 1st of the month (0=Sun, 1=Mon, ..., 6=Sat)
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            
+            // CALCULATE PADDING FOR MONDAY START:
+            // If the 1st is Monday (1), padding is 0.
+            // If the 1st is Sunday (0), padding is 6.
+            // Otherwise, padding is dayIndex - 1.
+            const paddingDays = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+
+
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // 3. Add blank cells for padding (preceding month)
+            for (let i = 0; i < paddingDays; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'p-2 text-sm text-center opacity-50 h-28 rounded-xl cursor-default';
+                calendarGrid.appendChild(emptyCell);
+            }
+
+            // 4. Populate current month days
+            let daysOffTogetherCount = 0;
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(year, month, day);
+                const dateKey = formatDate(date);
+                
+                const { status, classes } = getDailyStatus(dateKey, currentFilter);
+
+                const cell = document.createElement('div');
+                cell.className = `p-3 text-xs md:text-sm rounded-xl h-28 flex flex-col transition duration-200 cursor-pointer day-cell ${classes}`;
+                cell.dataset.date = dateKey; 
+                cell.addEventListener('click', () => openEditModal(dateKey));
+
+                // Day Number
+                const dayNumber = document.createElement('div');
+                dayNumber.className = 'font-extrabold text-xl mb-1';
+                dayNumber.textContent = day;
+                cell.appendChild(dayNumber);
+
+                // Status/Shift Time
+                const statusText = document.createElement('div');
+                statusText.className = 'leading-tight overflow-hidden font-semibold'; 
+                statusText.textContent = status;
+                cell.appendChild(statusText);
+
+                calendarGrid.appendChild(cell);
+
+                // Track days off together for the Gemini feature
+                if (getDailyStatus(dateKey, 'both').status === 'DAY OFF TOGETHER!') {
+                    daysOffTogetherCount++;
+                }
+            }
+            
+            // Enable/Disable the Gemini button based on the count
+            if (daysOffTogetherCount > 0) {
+                generateIdeasBtn.disabled = false;
+                generateIdeasBtn.textContent = `✨ Suggest Day-Off Activities (${daysOffTogetherCount} Days)`;
+            } else {
+                generateIdeasBtn.disabled = true;
+                generateIdeasBtn.textContent = `✨ No Shared Days Off This Month`;
+            }
+        }
+
+
+        // --- MODAL & SAVE LOGIC ---
+
+        /**
+         * Opens the edit modal, populating it with data for the clicked date.
+         */
+        function openEditModal(dateKey) {
+            if (!window.auth.currentUser) {
+                showMessage("App is still connecting. Please wait a moment.", 'error');
+                return;
+            }
+            editingDateKey = dateKey;
+            
+            // Get data for the date, defaulting to 'Day Off' if entry doesn't exist
+            const data = rotaMap.get(dateKey) || { mine: 'Day Off', yours: 'Day Off' }; 
+
+            document.getElementById('editDateDisplay').textContent = new Date(dateKey + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            
+            document.getElementById('mineStatus').value = data.mine;
+            document.getElementById('yoursStatus').value = data.yours;
+            
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        /**
+         * Closes the edit modal.
+         */
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+            editingDateKey = null;
+        }
+
+        /**
+         * Saves the changes from the modal inputs to the Firestore database.
+         */
+        async function saveShift() {
+            if (!editingDateKey || !window.auth.currentUser) return;
+
+            const newMineStatus = document.getElementById('mineStatus').value.trim();
+            const newYoursStatus = document.getElementById('yoursStatus').value.trim();
+            
+            // Get the current data structure (or initialize if this is the first entry)
+            let currentData = rotaMap.get(editingDateKey) || {};
+            
+            // Update the specific date entry
+            currentData.mine = newMineStatus;
+            currentData.yours = newYoursStatus;
+            rotaMap.set(editingDateKey, currentData);
+
+            // Convert Map back to a plain object for Firestore storage
+            const rotaObjectToSave = Object.fromEntries(rotaMap);
+            
+            try {
+                // Write the entire updated rota map back to the single shared document
+                const docRef = window.doc(window.db, window.ROTA_PATH);
+                await window.setDoc(docRef, { rota: rotaObjectToSave });
+
+                closeEditModal();
+                // The onSnapshot listener will automatically call renderCalendar()
+                showMessage(`Rota for ${editingDateKey} saved and shared!`, 'success');
+            } catch (e) {
+                console.error("Error saving document: ", e);
+                showMessage("Failed to save changes. Please try again.", 'error');
+            }
+        }
+        
+        // --- GEMINI FEATURE LOGIC ---
+
+        async function generateDateIdeas() {
+            ideasModal.classList.remove('hidden');
+            ideasContent.innerHTML = '';
+            ideasLoading.style.display = 'flex'; // Show loading
+
+            // 1. Identify shared days off for the current month
+            const year = currentMonth.getFullYear();
+            const month = currentMonth.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const sharedDays = [];
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(year, month, day);
+                const dateKey = formatDate(date);
+                
+                const data = rotaMap.get(dateKey) || { mine: '', yours: '' }; 
+                const mineStatus = data.mine.trim().toLowerCase();
+                const yoursStatus = data.yours.trim().toLowerCase();
+
+                if (mineStatus === 'day off' && yoursStatus === 'day off') {
+                    const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+                    sharedDays.push(`${dayOfWeek}, ${date.getDate()}`);
+                }
+            }
+
+            if (sharedDays.length === 0) {
+                ideasLoading.style.display = 'none';
+                ideasContent.innerHTML = '<p class="text-center font-semibold text-gray-500">There are no shared days off in the current view. Try planning some!</p>';
+                showMessage('No shared days off found this month.', 'error');
+                return;
+            }
+
+            // 2. Construct the Gemini Prompt
+            const dayList = sharedDays.join(', ');
+            const userQuery = `We have the following days off together this month: ${dayList}. We are looking for unique, modern, and fun date ideas or activities for each of these days. Please provide 3 distinct ideas for each date listed, tailored slightly to the day of the week (e.g., a relaxing activity for Sunday, a fun evening event for a Friday). Structure your response clearly using markdown headings for each date.`;
+
+            const systemPrompt = "You are a creative and helpful partnership planner. Your goal is to generate unique, relevant, and exciting activity suggestions for couples based on the day of the week, ensuring high-quality, actionable results. Use markdown for formatting, including lists.";
+
+            try {
+                // 3. Call the Gemini API with Grounding
+                const generatedText = await fetchGeminiResponse(userQuery, systemPrompt, true);
+                
+                // 4. Display the results
+                ideasLoading.style.display = 'none';
+                
+                // --- Markdown to HTML Conversion ---
+                let finalContent = generatedText;
+
+                // 1. Convert Markdown headings to H4 (using custom llm-content style)
+                finalContent = finalContent.replace(/### (.*)/g, '<h4 class="mt-4 text-xl font-bold text-rose-600 border-b border-pink-200 pb-1">$1</h4>');
+                
+                // 2. Wrap lists in <ul> and list items in <li>
+                // This is a complex heuristic, simplifying to basic text manipulation based on `* `
+                finalContent = finalContent
+                    // Replace start of list items with <li>, preserving initial line breaks
+                    .replace(/\n\* /g, '<ul><li>')
+                    // Replace subsequent list items
+                    .replace(/\* /g, '<li>')
+                    // Replace line breaks not followed by new list or heading with <br>
+                    .replace(/\n(?!<h4)/g, '<br>');
+
+                // 3. Close the list at the end of content or before a new heading
+                // This is still tricky, so we'll just simplify the output to be readable blocks.
+                
+                // Final basic cleanup
+                finalContent = finalContent
+                    .replace(/<ul><li>/g, '<ul><li>') // Ensure list starts
+                    .replace(/<\/li><br>/g, '</li>') // Remove breaks inside lists
+                    .replace(/<li><br><h4/g, '</li></ul><h4') // End list before new heading
+                    .replace(/<li><br><br>/g, '</li></ul><p>'); // End list before new paragraph
+
+                // For simplicity on mobile, revert to less aggressive list formatting:
+                finalContent = generatedText.replace(/### (.*)/g, '<h4>$1</h4>').replace(/\* /g, '<li>');
+                // Basic cleanup for block presentation (better for simple markdown lists)
+                finalContent = `<div class="p-2">${finalContent}</div>`; 
+
+
+                ideasContent.innerHTML = finalContent;
+
+
+            } catch (error) {
+                ideasLoading.style.display = 'none';
+                ideasContent.innerHTML = '<p class="text-center font-semibold text-red-500">Sorry, I couldn\'t fetch date ideas right now. Please try again later.</p>';
+                showMessage('Failed to generate ideas.', 'error');
+            }
+        }
+
+
+        // --- EVENT HANDLERS ---
+
+        /**
+         * Handles filter button clicks.
+         */
+        function handleFilterClick(e) {
+            const newFilter = e.currentTarget.dataset.filter;
+            if (newFilter === currentFilter) return;
+
+            currentFilter = newFilter;
+
+            // Update button styles
+            filterButtons.forEach(btn => {
+                // Remove existing gradient/shadow classes
+                btn.classList.remove('bg-gradient-to-br', 'from-indigo-500', 'to-indigo-600', 'shadow-xl', 'hover:shadow-2xl', 'text-white', 'hover:from-indigo-600', 'hover:to-indigo-700');
+                btn.classList.remove('shadow-md', 'bg-white', 'text-gray-700', 'hover:shadow-lg', 'hover:bg-gray-100');
+
+
+                if (btn.dataset.filter === currentFilter) {
+                    // Apply 'selected' (3D) style
+                    btn.classList.add('shadow-lg', 'bg-gradient-to-br', 'from-indigo-500', 'to-indigo-600', 'text-white', 'hover:shadow-xl', 'hover:from-indigo-600', 'hover:to-indigo-700');
+                } else {
+                    // Apply 'unselected' (flat/raised) style
+                    btn.classList.add('shadow-md', 'bg-white', 'text-gray-700', 'hover:shadow-lg', 'hover:bg-gray-100');
+                }
+            });
+
+            renderCalendar();
+        }
+
+        /**
+         * Changes the displayed month and re-renders the calendar.
+         */
+        function changeMonth(offset) {
+            currentMonth.setMonth(currentMonth.getMonth() + offset);
+            renderCalendar();
+        }
+
+
+        // --- INITIALIZATION ---
+
+        filterButtons.forEach(btn => btn.addEventListener('click', handleFilterClick));
+        document.getElementById('prevMonth').addEventListener('click', () => changeMonth(-1));
+        document.getElementById('nextMonth').addEventListener('click', () => changeMonth(1));
+
+        window.closeEditModal = closeEditModal;
+        window.saveShift = saveShift;
+        window.showMessage = showMessage;
+        window.generateDateIdeas = generateDateIdeas;
+
+        // Note: loadRotaData is called automatically after Firebase authentication is complete.
+    </script>
+
+</body>
+</html>
