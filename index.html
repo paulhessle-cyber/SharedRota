@@ -62,61 +62,85 @@
         import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // Initialize Firebase
         setLogLevel('Debug');
+        
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
+        let isFirebaseEnabled = Object.keys(firebaseConfig).length > 0;
 
-        // Define the publicly shared Firestore path
-        const ROTA_PATH = `/artifacts/${appId}/public/data/rotas/shared_rota_map`;
-        
+        let app = null;
+        let db = null;
+        let auth = null;
         let localUserId = null;
 
-        // Global functions to be used in the script tag
+        // --- FIREBASE INITIALIZATION ---
+        if (isFirebaseEnabled) {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+            } catch (e) {
+                console.error("Firebase Initialization Failed:", e);
+                isFirebaseEnabled = false;
+            }
+        }
+
+        // Expose global variables and functions for the main script block
         window.db = db;
         window.auth = auth;
-        window.ROTA_PATH = ROTA_PATH;
-        // EXPOSE CRITICAL FIRESTORE FUNCTIONS GLOBALLY FOR THE MAIN SCRIPT BLOCK
         window.doc = doc;
         window.setDoc = setDoc;
         window.onSnapshot = onSnapshot;
 
-        // Authentication and User ID setup
-        document.getElementById('userIdDisplay').textContent = `Authenticating...`; // Added initial status
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                localUserId = user.uid;
-                document.getElementById('userIdDisplay').textContent = `User ID: ${localUserId}`;
-                // Once authenticated, start loading data
-                window.loadRotaData();
-            } else {
-                // If no user is logged in (initial state or signed out), attempt sign-in
-                try {
-                    if (initialAuthToken) {
-                        // FIX: Added logging and visual status update before the async call
-                        document.getElementById('userIdDisplay').textContent = `Token Sign-in Attempt...`; 
-                        console.log("Attempting sign-in with Custom Token...");
-                        await signInWithCustomToken(auth, initialAuthToken);
-                    } else {
-                        // FIX: Added logging and visual status update before the async call
-                        document.getElementById('userIdDisplay').textContent = `Anonymous Sign-in Attempt...`;
-                        console.log("Attempting Anonymous sign-in (no custom token available)...");
-                        // This is the path for the publicly hosted app (GitHub Pages)
-                        await signInAnonymously(auth); 
-                        // The successful sign-in will trigger onAuthStateChanged again with a user object
+        // Define the publicly shared Firestore path
+        const ROTA_PATH = `/artifacts/${appId}/public/data/rotas/shared_rota_map`;
+        window.ROTA_PATH = ROTA_PATH;
+        
+        // --- AUTHENTICATION AND DATA LOAD ---
+        if (isFirebaseEnabled) {
+            document.getElementById('userIdDisplay').textContent = `Authenticating...`; 
+
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    localUserId = user.uid;
+                    document.getElementById('userIdDisplay').textContent = `User ID: ${localUserId}`;
+                    // Once authenticated, start loading data
+                    window.loadRotaData();
+                } else {
+                    // If no user is logged in, attempt sign-in
+                    try {
+                        if (initialAuthToken) {
+                            document.getElementById('userIdDisplay').textContent = `Token Sign-in Attempt...`; 
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            document.getElementById('userIdDisplay').textContent = `Anonymous Sign-in Attempt...`;
+                            await signInAnonymously(auth); 
+                        }
+                    } catch (error) {
+                        console.error("Firebase Auth failed:", error);
+                        document.getElementById('userIdDisplay').textContent = `Auth Failed!`; 
+                        window.showMessage("Authentication failed. Cannot access shared rota.", 'error');
+                        // Call renderCalendar even if auth fails to display the static part of the app
+                        window.renderCalendar();
                     }
-                } catch (error) {
-                    console.error("Firebase Auth failed:", error);
-                    document.getElementById('userIdDisplay').textContent = `Auth Failed!`; // Failed status
-                    window.showMessage("Authentication failed. Cannot access shared rota.", 'error');
                 }
-            }
-        });
+            });
+        } else {
+            // Firebase is not enabled (missing config)
+            document.getElementById('userIdDisplay').textContent = `FIREBASE DISABLED (Config Missing)`;
+            window.showMessage("Data storage is disabled. Missing Firebase configuration.", 'error');
+            // If Firebase is not enabled, we still need to render the calendar structure
+            window.renderCalendar();
+            // Create a stub for loadRotaData to prevent errors in the main script
+            window.loadRotaData = () => { 
+                document.getElementById('loadingOverlay').classList.remove('flex');
+                document.getElementById('loadingOverlay').classList.add('hidden');
+                document.getElementById('dataStatusMessage').style.display = 'block';
+                document.getElementById('dataStatusMessage').textContent = 'Cannot load data: Firebase is not initialized.';
+            };
+        }
 
     </script>
 </head>
@@ -255,6 +279,9 @@
         const ideasContent = document.getElementById('ideasContent');
         const ideasModal = document.getElementById('ideasModal');
         const ideasLoading = document.getElementById('ideasLoading');
+        
+        // Check if Firebase was initialized in the module script
+        const isFirebaseInitialized = !!window.db; 
 
         const apiKey = "";
         // Updated API URL to use the latest model version for consistency
@@ -318,6 +345,12 @@
 
         // --- FIREBASE DATA LOAD ---
         window.loadRotaData = function() {
+            if (!isFirebaseInitialized) {
+                // If Firebase wasn't initialized, the stub function from the module runs, 
+                // but we should show the overlay briefly just in case.
+                return;
+            }
+
             loadingOverlay.classList.remove('hidden');
             loadingOverlay.classList.add('flex');
             dataStatusMessage.textContent = 'Loading...';
@@ -427,13 +460,19 @@
         /**
          * Renders the calendar grid for the currentMonth.
          */
-        function renderCalendar() {
+        window.renderCalendar = function() {
             // 1. Update Month/Year Header
             currentMonthYear.textContent = currentMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' });
             calendarGrid.innerHTML = ''; 
             
             // Ensure status message is hidden if data is loading/loaded
-            dataStatusMessage.style.display = 'none';
+            if (isFirebaseInitialized) {
+                 dataStatusMessage.style.display = 'none';
+            } else {
+                 dataStatusMessage.style.display = 'block';
+                 dataStatusMessage.textContent = 'Calendar view only. Editing requires Firebase config.';
+            }
+
 
             // 2. Calculate dates for the current month
             const year = currentMonth.getFullYear();
@@ -467,9 +506,12 @@
                 const { status, classes } = getDailyStatus(dateKey, currentFilter);
 
                 const cell = document.createElement('div');
-                cell.className = `p-3 text-xs md:text-sm rounded-xl h-28 flex flex-col transition duration-200 cursor-pointer day-cell ${classes}`;
+                cell.className = `p-3 text-xs md:text-sm rounded-xl h-28 flex flex-col transition duration-200 day-cell ${isFirebaseInitialized ? 'cursor-pointer' : 'cursor-not-allowed'} ${classes}`;
                 cell.dataset.date = dateKey; 
-                cell.addEventListener('click', () => openEditModal(dateKey));
+                
+                if (isFirebaseInitialized) {
+                    cell.addEventListener('click', () => openEditModal(dateKey));
+                }
 
                 // Day Number
                 const dayNumber = document.createElement('div');
@@ -491,10 +533,13 @@
                 }
             }
             
-            // Enable/Disable the Gemini button based on the count
-            if (daysOffTogetherCount > 0) {
+            // Enable/Disable the Gemini button based on the count and Firebase status
+            if (isFirebaseInitialized && daysOffTogetherCount > 0) {
                 generateIdeasBtn.disabled = false;
                 generateIdeasBtn.textContent = `✨ Suggest Day-Off Activities (${daysOffTogetherCount} Days)`;
+            } else if (!isFirebaseInitialized) {
+                generateIdeasBtn.disabled = true;
+                generateIdeasBtn.textContent = `✨ Data Disabled (No Ideas)`;
             } else {
                 generateIdeasBtn.disabled = true;
                 generateIdeasBtn.textContent = `✨ No Shared Days Off This Month`;
@@ -508,9 +553,14 @@
          * Opens the edit modal, populating it with data for the clicked date.
          */
         function openEditModal(dateKey) {
+            if (!isFirebaseInitialized) {
+                 showMessage("Cannot edit: Firebase is not configured.", 'error');
+                 return;
+            }
+
             // Check for authentication before opening the modal
             if (!window.auth.currentUser) {
-                showMessage("Authentication required! Please wait for 'Auth Failed' or 'User ID' status.", 'error');
+                showMessage("Authentication required! Please wait for 'User ID' status.", 'error');
                 return;
             }
             editingDateKey = dateKey;
@@ -538,7 +588,7 @@
          * Saves the changes from the modal inputs to the Firestore database.
          */
         async function saveShift() {
-            if (!editingDateKey || !window.auth.currentUser) return;
+            if (!isFirebaseInitialized || !editingDateKey || !window.auth.currentUser) return;
 
             const newMineStatus = document.getElementById('mineStatus').value.trim();
             const newYoursStatus = document.getElementById('yoursStatus').value.trim();
@@ -571,6 +621,11 @@
         // --- GEMINI FEATURE LOGIC ---
 
         async function generateDateIdeas() {
+            if (!isFirebaseInitialized) {
+                 showMessage("Cannot generate ideas: Data service is disabled.", 'error');
+                 return;
+            }
+
             ideasModal.classList.remove('hidden');
             ideasContent.innerHTML = '';
             ideasLoading.style.display = 'flex'; // Show loading
@@ -615,29 +670,42 @@
                 // 4. Display the results
                 ideasLoading.style.display = 'none';
                 
-                // --- Markdown to HTML Conversion ---
+                // Simple Markdown to HTML Conversion
                 let finalContent = generatedText;
 
-                // 1. Convert Markdown headings to H4 (using custom llm-content style)
+                // 1. Convert Markdown headings to H4
                 finalContent = finalContent.replace(/### (.*)/g, '<h4 class="mt-4 text-xl font-bold text-rose-600 border-b border-pink-200 pb-1">$1</h4>');
-                
-                // 2. Wrap lists in <ul> and list items in <li>
+                finalContent = finalContent.replace(/## (.*)/g, '<h4 class="mt-4 text-xl font-bold text-rose-600 border-b border-pink-200 pb-1">$1</h4>');
+                finalContent = finalContent.replace(/# (.*)/g, '<h4 class="mt-4 text-xl font-bold text-rose-600 border-b border-pink-200 pb-1">$1</h4>');
+
+                // 2. Simple list wrapping (better than nothing)
                 // This is a complex heuristic, simplifying to basic text manipulation based on `* `
-                finalContent = finalContent
-                    // Replace start of list items with <ul><li>
-                    .replace(/\n\* /g, '<ul><li>')
-                    // Replace subsequent list items
-                    .replace(/\* /g, '<li>')
-                    // Replace line breaks not followed by new list or heading with <br>
-                    .replace(/\n(?!<h4)/g, '<br>');
+                const lines = finalContent.split('\n');
+                let inList = false;
+                let processedContent = '';
 
-                // Final basic cleanup
-                finalContent = generatedText.replace(/### (.*)/g, '<h4>$1</h4>').replace(/\* /g, '<li>');
-                // Basic cleanup for block presentation (better for simple markdown lists)
-                finalContent = `<div class="p-2">${finalContent}</div>`; 
+                for (const line of lines) {
+                    if (line.trim().startsWith('* ')) {
+                        if (!inList) {
+                            processedContent += '<ul>';
+                            inList = true;
+                        }
+                        processedContent += `<li>${line.substring(2).trim()}</li>`;
+                    } else {
+                        if (inList) {
+                            processedContent += '</ul>';
+                            inList = false;
+                        }
+                        if (line.trim().startsWith('<h4>')) {
+                            processedContent += line; // Keep heading
+                        } else {
+                            processedContent += `<p>${line}</p>`; // Wrap paragraphs
+                        }
+                    }
+                }
+                if (inList) processedContent += '</ul>';
 
-
-                ideasContent.innerHTML = finalContent;
+                ideasContent.innerHTML = `<div class="p-2">${processedContent}</div>`; 
 
 
             } catch (error) {
@@ -698,7 +766,8 @@
         window.showMessage = showMessage;
         window.generateDateIdeas = generateDateIdeas;
 
-        // Note: loadRotaData is called automatically after Firebase authentication is complete.
+        // If Firebase wasn't initialized in the module script, renderCalendar() was called there.
+        // If Firebase *was* initialized, the auth listener will eventually call loadRotaData() which calls renderCalendar().
     </script>
 
 </body>
