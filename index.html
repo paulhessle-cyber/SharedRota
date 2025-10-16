@@ -251,7 +251,8 @@
         const ideasLoading = document.getElementById('ideasLoading');
 
         const apiKey = "";
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+        // Updated API URL to use the latest model version for consistency
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
         // --- GEMINI API UTILITY ---
         async function fetchGeminiResponse(userQuery, systemPrompt, useGrounding = false) {
