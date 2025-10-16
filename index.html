@@ -87,6 +87,7 @@
         window.onSnapshot = onSnapshot;
 
         // Authentication and User ID setup
+        document.getElementById('userIdDisplay').textContent = `Authenticating...`; // Added initial status
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 localUserId = user.uid;
@@ -94,15 +95,18 @@
                 // Once authenticated, start loading data
                 window.loadRotaData();
             } else {
+                // If no user is logged in (initial state or signed out), attempt sign-in
                 try {
                     if (initialAuthToken) {
                         await signInWithCustomToken(auth, initialAuthToken);
                     } else {
-                        await signInAnonymously(auth);
-                        // User ID will be set by the onAuthStateChanged listener above
+                        // This is the path for the publicly hosted app (GitHub Pages)
+                        await signInAnonymously(auth); 
+                        // The successful sign-in will trigger onAuthStateChanged again with a user object
                     }
                 } catch (error) {
                     console.error("Firebase Auth failed:", error);
+                    document.getElementById('userIdDisplay').textContent = `Auth Failed!`; // Failed status
                     window.showMessage("Authentication failed. Cannot access shared rota.", 'error');
                 }
             }
@@ -128,7 +132,7 @@
         <!-- Header and Controls -->
         <header class="p-4 md:p-6 bg-indigo-700 text-white flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 shadow-inner">
             <h1 class="text-2xl font-extrabold tracking-tight">Shared Rota Viewer</h1>
-            <div id="userIdDisplay" class="text-xs opacity-75 truncate max-w-full">Connecting...</div>
+            <div id="userIdDisplay" class="text-xs opacity-75 truncate max-w-full">Authenticating...</div>
             
             <!-- Navigation -->
             <div class="flex space-x-2">
@@ -497,8 +501,9 @@
          * Opens the edit modal, populating it with data for the clicked date.
          */
         function openEditModal(dateKey) {
+            // Check for authentication before opening the modal
             if (!window.auth.currentUser) {
-                showMessage("App is still connecting. Please wait a moment.", 'error');
+                showMessage("Authentication required! Please wait for 'Auth Failed' or 'User ID' status.", 'error');
                 return;
             }
             editingDateKey = dateKey;
@@ -612,24 +617,14 @@
                 // 2. Wrap lists in <ul> and list items in <li>
                 // This is a complex heuristic, simplifying to basic text manipulation based on `* `
                 finalContent = finalContent
-                    // Replace start of list items with <li>, preserving initial line breaks
+                    // Replace start of list items with <ul><li>
                     .replace(/\n\* /g, '<ul><li>')
                     // Replace subsequent list items
                     .replace(/\* /g, '<li>')
                     // Replace line breaks not followed by new list or heading with <br>
                     .replace(/\n(?!<h4)/g, '<br>');
 
-                // 3. Close the list at the end of content or before a new heading
-                // This is still tricky, so we'll just simplify the output to be readable blocks.
-                
                 // Final basic cleanup
-                finalContent = finalContent
-                    .replace(/<ul><li>/g, '<ul><li>') // Ensure list starts
-                    .replace(/<\/li><br>/g, '</li>') // Remove breaks inside lists
-                    .replace(/<li><br><h4/g, '</li></ul><h4') // End list before new heading
-                    .replace(/<li><br><br>/g, '</li></ul><p>'); // End list before new paragraph
-
-                // For simplicity on mobile, revert to less aggressive list formatting:
                 finalContent = generatedText.replace(/### (.*)/g, '<h4>$1</h4>').replace(/\* /g, '<li>');
                 // Basic cleanup for block presentation (better for simple markdown lists)
                 finalContent = `<div class="p-2">${finalContent}</div>`; 
