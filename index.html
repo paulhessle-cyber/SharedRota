@@ -17,7 +17,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 10px;
+            padding: 5px;
         }
 
         .container {
@@ -129,35 +129,35 @@
         }
 
         .calendar {
-            padding: 15px;
+            padding: 10px;
         }
 
         .weekdays {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            gap: 5px;
-            margin-bottom: 5px;
+            gap: 3px;
+            margin-bottom: 3px;
         }
 
         .weekday {
             text-align: center;
             font-weight: 600;
             color: #667eea;
-            padding: 5px;
-            font-size: 0.85em;
+            padding: 5px 2px;
+            font-size: 0.75em;
         }
 
         .days {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            gap: 5px;
+            gap: 3px;
         }
 
         .day {
             aspect-ratio: 1;
             border: 2px solid #e9ecef;
-            border-radius: 12px;
-            padding: 8px;
+            border-radius: 8px;
+            padding: 4px;
             cursor: pointer;
             transition: all 0.2s;
             display: flex;
@@ -166,6 +166,7 @@
             box-shadow: 0 3px 6px rgba(0,0,0,0.1),
                         0 1px 3px rgba(0,0,0,0.08),
                         inset 0 -1px 2px rgba(0,0,0,0.1);
+            min-width: 0;
         }
 
         .day:hover {
@@ -196,17 +197,20 @@
 
         .day-number {
             font-weight: 600;
-            font-size: 0.85em;
+            font-size: 0.75em;
             color: #333;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
 
         .day-status {
-            font-size: 0.65em;
+            font-size: 0.55em;
             color: #666;
             text-align: center;
             margin-top: auto;
-            line-height: 1.2;
+            line-height: 1.1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .day.off {
@@ -428,12 +432,30 @@
         }
 
         @media (max-width: 768px) {
+            .container {
+                border-radius: 15px;
+            }
+
+            .calendar {
+                padding: 8px;
+            }
+
+            .day {
+                padding: 3px;
+                border-radius: 6px;
+            }
+
             .day-status {
-                font-size: 0.6em;
+                font-size: 0.5em;
             }
             
             .day-number {
-                font-size: 0.8em;
+                font-size: 0.7em;
+            }
+
+            .weekday {
+                font-size: 0.7em;
+                padding: 3px 1px;
             }
         }
     </style>
