@@ -507,43 +507,56 @@
     <div class="sync-status" id="syncStatus">Synced</div>
 
     <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-database-compat.min.js"></script>
 
     <script>
         // FIREBASE CONFIG - REPLACE THESE VALUES WITH YOUR OWN
-       // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+        const firebaseConfig = {
+            apiKey: "AIzaSyB2bPJ5v4p10BqgSg_3y2_D1bwetmcPXi0",
+            authDomain: "shared-rota.firebaseapp.com",
+            databaseURL: "https://shared-rota-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "shared-rota",
+            storageBucket: "shared-rota.firebasestorage.app",
+            messagingSenderId: "632941830643",
+            appId: "1:632941830643:web:e4eafb14ac067862bbb286"
+        };
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyB2bPJ5v4p10BqgSg_3y2_D1bwetmcPXi0",
-  authDomain: "shared-rota.firebaseapp.com",
-  databaseURL: "https://shared-rota-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "shared-rota",
-  storageBucket: "shared-rota.firebasestorage.app",
-  messagingSenderId: "632941830643",
-  appId: "1:632941830643:web:e4eafb14ac067862bbb286",
-  measurementId: "G-QRJ1D0S7V4"
-};
+        // Initialize Firebase
+        let database;
+        let isFirebaseInitialized = false;
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+        // Wait for Firebase to load
+        window.addEventListener('load', function() {
+            try {
+                // Check if Firebase loaded
+                if (typeof firebase === 'undefined') {
+                    console.warn('Firebase SDK not loaded - using local storage only');
+                    isFirebaseInitialized = false;
+                    init();
+                    return;
+                }
 
-        try {
-            firebase.initializeApp(firebaseConfig);
-            database = firebase.database();
-            isFirebaseInitialized = true;
-            console.log('Firebase initialized successfully');
-        } catch (error) {
-            console.error('Firebase initialization error:', error);
-            alert('Please configure Firebase settings in the code. See instructions below the calendar.');
-        }
+                // Check if config has been updated
+                if (firebaseConfig.apiKey === "YOUR_API_KEY_HERE") {
+                    console.warn('Firebase not configured - using local storage only');
+                    isFirebaseInitialized = false;
+                    init();
+                    return;
+                }
+
+                firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                isFirebaseInitialized = true;
+                console.log('Firebase initialized successfully');
+                init();
+            } catch (error) {
+                console.error('Firebase initialization error:', error);
+                console.log('Falling back to local storage');
+                isFirebaseInitialized = false;
+                init();
+            }
+        });
 
         let currentDate = new Date();
         let currentView = 'mine';
@@ -562,8 +575,21 @@ const analytics = getAnalytics(app);
 
         // Load data from Firebase
         function loadData() {
-            if (!isFirebaseInitialized) return;
+            if (!isFirebaseInitialized) {
+                console.log('Loading from local storage');
+                try {
+                    const saved = localStorage.getItem('rotaData');
+                    if (saved) {
+                        rotaData = JSON.parse(saved);
+                    }
+                } catch (e) {
+                    console.error('Error loading from localStorage:', e);
+                }
+                renderCalendar();
+                return;
+            }
             
+            console.log('Loading from Firebase');
             const rotaRef = database.ref('rota');
             rotaRef.on('value', (snapshot) => {
                 const data = snapshot.val();
@@ -572,13 +598,21 @@ const analytics = getAnalytics(app);
                     renderCalendar();
                     showSyncStatus('Synced', 'synced');
                 }
+            }, (error) => {
+                console.error('Firebase read error:', error);
+                showSyncStatus('Sync error', 'error');
             });
         }
 
         // Save data to Firebase
         function saveData() {
             if (!isFirebaseInitialized) {
-                alert('Firebase not configured. Data cannot be saved.');
+                console.log('Saving to local storage');
+                try {
+                    localStorage.setItem('rotaData', JSON.stringify(rotaData));
+                } catch (e) {
+                    console.error('Error saving to localStorage:', e);
+                }
                 return;
             }
 
@@ -595,9 +629,8 @@ const analytics = getAnalytics(app);
         }
 
         function init() {
-            if (isFirebaseInitialized) {
-                loadData();
-            }
+            console.log('Initializing app...');
+            loadData();
             renderCalendar();
             attachEventListeners();
         }
@@ -779,8 +812,6 @@ const analytics = getAnalytics(app);
                 closeModal();
             }
         }
-
-        init();
     </script>
 </body>
 </html>
