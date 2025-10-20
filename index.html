@@ -199,7 +199,7 @@
         }
 
         .day-number {
-            font-weight: 600;
+            font-weight: 400;
             font-size: 0.75em;
             color: #333;
             margin-bottom: 2px;
@@ -218,6 +218,10 @@
             text-shadow: 0 1px 0 rgba(255,255,255,0.5);
         }
 
+        .day-status.bold {
+            font-weight: 700;
+        }
+
         .day.off {
             background: linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 50%, #e0e0e0 51%, #d8d8d8 100%);
         }
@@ -231,7 +235,7 @@
         }
 
         .day.both-off {
-            background: linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 50%, #e0e0e0 51%, #d8d8d8 100%);
+            background: linear-gradient(180deg, #fecaca 0%, #fca5a5 50%, #f87171 51%, #ef4444 100%);
         }
 
         .modal {
@@ -526,13 +530,6 @@
 
         .todo-content {
             flex: 1;
-        }
-
-        .todo-person {
-            font-weight: 600;
-            font-size: 0.85em;
-            color: #333;
-            margin-bottom: 4px;
         }
 
         .todo-text {
@@ -907,6 +904,9 @@
                     } else {
                         dayEl.classList.add('working');
                         dayStatus.textContent = dayData.mine.shift || 'Working';
+                        if (dayData.mine.shift) {
+                            dayStatus.classList.add('bold');
+                        }
                     }
                 } else if (currentView === 'yours') {
                     if (dayData.yours.status === 'off') {
@@ -918,6 +918,9 @@
                     } else {
                         dayEl.classList.add('working');
                         dayStatus.textContent = dayData.yours.shift || 'Working';
+                        if (dayData.yours.shift) {
+                            dayStatus.classList.add('bold');
+                        }
                     }
                 } else {
                     if (dayData.mine.status === 'off' && dayData.yours.status === 'off') {
@@ -941,24 +944,35 @@
             const todoListEl = document.getElementById('todoList');
             todoListEl.innerHTML = '';
 
-            // Get all dates with todos
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Get all dates with todos for current month
             const todosWithDates = [];
             for (const [dateStr, data] of Object.entries(rotaData)) {
-                if (data.mine && data.mine.todo) {
-                    todosWithDates.push({
-                        date: dateStr,
-                        person: 'paul',
-                        personName: 'Paul',
-                        todo: data.mine.todo
-                    });
-                }
-                if (data.yours && data.yours.todo) {
-                    todosWithDates.push({
-                        date: dateStr,
-                        person: 'rachel',
-                        personName: 'Rachel',
-                        todo: data.yours.todo
-                    });
+                const itemDate = new Date(dateStr);
+                
+                // Only show if in current month and not in the past
+                if (itemDate.getFullYear() === year && 
+                    itemDate.getMonth() === month &&
+                    itemDate >= today) {
+                    
+                    if (data.mine && data.mine.todo) {
+                        todosWithDates.push({
+                            date: dateStr,
+                            person: 'paul',
+                            todo: data.mine.todo
+                        });
+                    }
+                    if (data.yours && data.yours.todo) {
+                        todosWithDates.push({
+                            date: dateStr,
+                            person: 'rachel',
+                            todo: data.yours.todo
+                        });
+                    }
                 }
             }
 
@@ -966,7 +980,7 @@
             todosWithDates.sort((a, b) => new Date(a.date) - new Date(b.date));
 
             if (todosWithDates.length === 0) {
-                todoListEl.innerHTML = '<div class="todo-empty">No tasks scheduled yet</div>';
+                todoListEl.innerHTML = '<div class="todo-empty">No tasks scheduled for this month</div>';
                 return;
             }
 
@@ -980,7 +994,6 @@
                 todoItem.innerHTML = `
                     <div class="todo-date">${formattedDate}</div>
                     <div class="todo-content">
-                        <div class="todo-person">${item.personName}</div>
                         <div class="todo-text">${item.todo}</div>
                     </div>
                 `;
