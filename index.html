@@ -51,38 +51,42 @@
         .view-btn {
             padding: 10px 20px;
             font-size: 14px;
-            border: 2px solid white;
-            background: transparent;
-            color: white;
-            border-radius: 25px;
+            border: none;
+            color: #333;
+            border-radius: 12px;
             cursor: pointer;
             transition: all 0.2s;
             font-weight: 600;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2), 
-                        0 1px 3px rgba(0,0,0,0.1),
-                        inset 0 -2px 4px rgba(0,0,0,0.2);
+            background: linear-gradient(180deg, #e8e8e8 0%, #b8b8b8 50%, #a0a0a0 51%, #8a8a8a 100%);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3),
+                        inset 0 1px 0 rgba(255,255,255,0.5),
+                        inset 0 -1px 0 rgba(0,0,0,0.2);
+            text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+            border: 1px solid #666;
         }
 
         .view-btn:hover {
-            background: white;
-            color: #667eea;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.25), 
-                        0 2px 4px rgba(0,0,0,0.15),
-                        inset 0 -2px 4px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.35),
+                        inset 0 1px 0 rgba(255,255,255,0.5),
+                        inset 0 -1px 0 rgba(0,0,0,0.2);
         }
 
         .view-btn:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2), 
-                        inset 0 2px 4px rgba(0,0,0,0.2);
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3),
+                        inset 0 2px 4px rgba(0,0,0,0.3),
+                        inset 0 1px 0 rgba(0,0,0,0.2);
+            background: linear-gradient(180deg, #808080 0%, #909090 50%, #a0a0a0 51%, #b0b0b0 100%);
         }
 
         .view-btn.active {
-            background: white;
-            color: #667eea;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2), 
-                        inset 0 2px 4px rgba(0,0,0,0.15);
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3),
+                        inset 0 3px 5px rgba(0,0,0,0.4),
+                        inset 0 1px 0 rgba(0,0,0,0.3);
+            background: linear-gradient(180deg, #707070 0%, #888888 50%, #959595 51%, #a8a8a8 100%);
+            text-shadow: 0 -1px 0 rgba(0,0,0,0.3);
         }
 
         .calendar-controls {
@@ -155,37 +159,36 @@
 
         .day {
             aspect-ratio: 1;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.2);
+            border-radius: 15px;
             padding: 4px;
             cursor: pointer;
             transition: all 0.2s;
             display: flex;
             flex-direction: column;
             position: relative;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.1),
-                        0 1px 3px rgba(0,0,0,0.08),
-                        inset 0 -1px 2px rgba(0,0,0,0.1);
             min-width: 0;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3),
+                        inset 0 1px 0 rgba(255,255,255,0.6),
+                        inset 0 -2px 3px rgba(0,0,0,0.15);
         }
 
         .day:hover {
-            border-color: #667eea;
-            transform: translateY(-3px);
-            box-shadow: 0 6px 12px rgba(102, 126, 234, 0.3),
-                        0 2px 6px rgba(0,0,0,0.15),
-                        inset 0 -1px 2px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.35),
+                        inset 0 1px 0 rgba(255,255,255,0.6),
+                        inset 0 -2px 3px rgba(0,0,0,0.15);
         }
 
         .day:active {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1),
-                        inset 0 2px 4px rgba(0,0,0,0.15);
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3),
+                        inset 0 2px 4px rgba(0,0,0,0.25);
         }
 
         .day.empty {
             cursor: default;
-            background: #f8f9fa;
+            background: transparent;
             border-color: transparent;
             box-shadow: none;
         }
@@ -200,32 +203,35 @@
             font-size: 0.75em;
             color: #333;
             margin-bottom: 2px;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.7);
         }
 
         .day-status {
             font-size: 0.55em;
-            color: #666;
+            color: #333;
             text-align: center;
             margin-top: auto;
             line-height: 1.1;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.5);
         }
 
         .day.off {
-            background: #dcfce7;
-            border-color: #22c55e;
+            background: linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 50%, #e0e0e0 51%, #d8d8d8 100%);
         }
 
         .day.working {
-            background: #fef3c7;
-            border-color: #fbbf24;
+            background: linear-gradient(180deg, #fff9c4 0%, #ffeb3b 50%, #fdd835 51%, #f9a825 100%);
+        }
+
+        .day.leave {
+            background: linear-gradient(180deg, #b3e5fc 0%, #4fc3f7 50%, #29b6f6 51%, #03a9f4 100%);
         }
 
         .day.both-off {
-            background: #ddd6fe;
-            border-color: #8b5cf6;
+            background: linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 50%, #e0e0e0 51%, #d8d8d8 100%);
         }
 
         .modal {
@@ -286,37 +292,39 @@
         .toggle-btn {
             flex: 1;
             padding: 12px;
-            border: 2px solid #e9ecef;
-            background: white;
+            border: 1px solid #666;
             border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
             transition: all 0.2s;
             font-weight: 600;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.08),
-                        0 1px 3px rgba(0,0,0,0.06),
-                        inset 0 -1px 2px rgba(0,0,0,0.08);
+            background: linear-gradient(180deg, #e8e8e8 0%, #b8b8b8 50%, #a0a0a0 51%, #8a8a8a 100%);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3),
+                        inset 0 1px 0 rgba(255,255,255,0.5),
+                        inset 0 -1px 0 rgba(0,0,0,0.2);
+            text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+            color: #333;
         }
 
         .toggle-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 10px rgba(0,0,0,0.12),
-                        0 2px 4px rgba(0,0,0,0.1),
-                        inset 0 -1px 2px rgba(0,0,0,0.08);
+            transform: translateY(-1px);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.35),
+                        inset 0 1px 0 rgba(255,255,255,0.5),
+                        inset 0 -1px 0 rgba(0,0,0,0.2);
         }
 
         .toggle-btn:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1),
-                        inset 0 2px 4px rgba(0,0,0,0.12);
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3),
+                        inset 0 2px 4px rgba(0,0,0,0.3);
         }
 
         .toggle-btn.active {
-            border-color: #667eea;
-            background: #ede9fe;
-            color: #667eea;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1),
-                        inset 0 2px 4px rgba(102, 126, 234, 0.15);
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3),
+                        inset 0 3px 5px rgba(0,0,0,0.4);
+            background: linear-gradient(180deg, #707070 0%, #888888 50%, #959595 51%, #a8a8a8 100%);
+            text-shadow: 0 -1px 0 rgba(0,0,0,0.3);
         }
 
         .shift-input-container {
@@ -347,6 +355,31 @@
         }
 
         .shift-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1),
+                        inset 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .todo-input-container {
+            margin-top: 15px;
+        }
+
+        .todo-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05),
+                        inset 0 1px 2px rgba(0,0,0,0.05);
+            min-height: 60px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .todo-input:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1),
@@ -431,6 +464,96 @@
             color: #166534;
         }
 
+        .todo-section {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 2px solid #e9ecef;
+        }
+
+        .todo-header {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .todo-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .todo-item {
+            display: flex;
+            gap: 10px;
+            padding: 12px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .todo-item.paul {
+            align-self: flex-start;
+            max-width: 80%;
+        }
+
+        .todo-item.rachel {
+            align-self: flex-end;
+            max-width: 80%;
+        }
+
+        .todo-date {
+            font-size: 0.75em;
+            color: #667eea;
+            font-weight: 600;
+            min-width: 60px;
+        }
+
+        .todo-content {
+            flex: 1;
+        }
+
+        .todo-person {
+            font-weight: 600;
+            font-size: 0.85em;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .todo-text {
+            font-size: 0.9em;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        .todo-empty {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .todo-item {
+                max-width: 90% !important;
+            }
+        }
+
         @media (max-width: 768px) {
             .container {
                 border-radius: 15px;
@@ -489,6 +612,11 @@
             </div>
             <div class="days" id="days"></div>
         </div>
+
+        <div class="todo-section">
+            <div class="todo-header">To Do List</div>
+            <div class="todo-list" id="todoList"></div>
+        </div>
     </div>
 
     <div class="modal" id="modal">
@@ -499,11 +627,16 @@
                 <div class="person-title">Paul</div>
                 <div class="status-toggle">
                     <button class="toggle-btn" data-person="mine" data-status="working">Working</button>
+                    <button class="toggle-btn" data-person="mine" data-status="leave">Leave</button>
                     <button class="toggle-btn" data-person="mine" data-status="off">Day Off</button>
                 </div>
                 <div class="shift-input-container" id="mineShiftContainer">
                     <label class="input-label">Shift Details</label>
                     <input type="text" class="shift-input" id="mineShift" placeholder="e.g., 9-5, Night shift, Early">
+                </div>
+                <div class="todo-input-container">
+                    <label class="input-label">To Do (Optional)</label>
+                    <textarea class="todo-input" id="mineTodo" placeholder="Add any tasks or reminders for this day..."></textarea>
                 </div>
             </div>
 
@@ -511,11 +644,16 @@
                 <div class="person-title">Rachel</div>
                 <div class="status-toggle">
                     <button class="toggle-btn" data-person="yours" data-status="working">Working</button>
+                    <button class="toggle-btn" data-person="yours" data-status="leave">Leave</button>
                     <button class="toggle-btn" data-person="yours" data-status="off">Day Off</button>
                 </div>
                 <div class="shift-input-container" id="yoursShiftContainer">
                     <label class="input-label">Shift Details</label>
                     <input type="text" class="shift-input" id="yoursShift" placeholder="e.g., 9-5, Night shift, Early">
+                </div>
+                <div class="todo-input-container">
+                    <label class="input-label">To Do (Optional)</label>
+                    <textarea class="todo-input" id="yoursTodo" placeholder="Add any tasks or reminders for this day..."></textarea>
                 </div>
             </div>
 
@@ -584,7 +722,10 @@
         let currentView = 'mine';
         let rotaData = {};
         let selectedDate = null;
-        let editingData = { mine: { status: 'working', shift: '' }, yours: { status: 'working', shift: '' } };
+        let editingData = { 
+            mine: { status: 'working', shift: '', todo: '' }, 
+            yours: { status: 'working', shift: '', todo: '' } 
+        };
 
         function showSyncStatus(message, type) {
             const status = document.getElementById('syncStatus');
@@ -706,6 +847,14 @@
                 editingData.yours.shift = e.target.value;
             });
 
+            document.getElementById('mineTodo').addEventListener('input', (e) => {
+                editingData.mine.todo = e.target.value;
+            });
+
+            document.getElementById('yoursTodo').addEventListener('input', (e) => {
+                editingData.yours.todo = e.target.value;
+            });
+
             document.getElementById('cancelBtn').addEventListener('click', closeModal);
             document.getElementById('saveBtn').addEventListener('click', saveDay);
         }
@@ -733,8 +882,8 @@
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const dayData = rotaData[dateStr] || { 
-                    mine: { status: 'working', shift: '' }, 
-                    yours: { status: 'working', shift: '' } 
+                    mine: { status: 'working', shift: '', todo: '' }, 
+                    yours: { status: 'working', shift: '', todo: '' } 
                 };
 
                 const dayEl = document.createElement('div');
@@ -752,6 +901,9 @@
                     if (dayData.mine.status === 'off') {
                         dayEl.classList.add('off');
                         dayStatus.textContent = 'Day Off';
+                    } else if (dayData.mine.status === 'leave') {
+                        dayEl.classList.add('leave');
+                        dayStatus.textContent = 'Leave';
                     } else {
                         dayEl.classList.add('working');
                         dayStatus.textContent = dayData.mine.shift || 'Working';
@@ -760,6 +912,9 @@
                     if (dayData.yours.status === 'off') {
                         dayEl.classList.add('off');
                         dayStatus.textContent = 'Day Off';
+                    } else if (dayData.yours.status === 'leave') {
+                        dayEl.classList.add('leave');
+                        dayStatus.textContent = 'Leave';
                     } else {
                         dayEl.classList.add('working');
                         dayStatus.textContent = dayData.yours.shift || 'Working';
@@ -778,13 +933,67 @@
                 dayEl.addEventListener('click', () => openModal(dateStr));
                 daysContainer.appendChild(dayEl);
             }
+
+            renderTodoList();
+        }
+
+        function renderTodoList() {
+            const todoListEl = document.getElementById('todoList');
+            todoListEl.innerHTML = '';
+
+            // Get all dates with todos
+            const todosWithDates = [];
+            for (const [dateStr, data] of Object.entries(rotaData)) {
+                if (data.mine && data.mine.todo) {
+                    todosWithDates.push({
+                        date: dateStr,
+                        person: 'paul',
+                        personName: 'Paul',
+                        todo: data.mine.todo
+                    });
+                }
+                if (data.yours && data.yours.todo) {
+                    todosWithDates.push({
+                        date: dateStr,
+                        person: 'rachel',
+                        personName: 'Rachel',
+                        todo: data.yours.todo
+                    });
+                }
+            }
+
+            // Sort by date
+            todosWithDates.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            if (todosWithDates.length === 0) {
+                todoListEl.innerHTML = '<div class="todo-empty">No tasks scheduled yet</div>';
+                return;
+            }
+
+            todosWithDates.forEach(item => {
+                const todoItem = document.createElement('div');
+                todoItem.className = `todo-item ${item.person}`;
+
+                const date = new Date(item.date);
+                const formattedDate = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+                todoItem.innerHTML = `
+                    <div class="todo-date">${formattedDate}</div>
+                    <div class="todo-content">
+                        <div class="todo-person">${item.personName}</div>
+                        <div class="todo-text">${item.todo}</div>
+                    </div>
+                `;
+
+                todoListEl.appendChild(todoItem);
+            });
         }
 
         function openModal(dateStr) {
             selectedDate = dateStr;
             const dayData = rotaData[dateStr] || { 
-                mine: { status: 'working', shift: '' }, 
-                yours: { status: 'working', shift: '' } 
+                mine: { status: 'working', shift: '', todo: '' }, 
+                yours: { status: 'working', shift: '', todo: '' } 
             };
             
             editingData = JSON.parse(JSON.stringify(dayData));
@@ -805,6 +1014,8 @@
 
             document.getElementById('mineShift').value = editingData.mine.shift || '';
             document.getElementById('yoursShift').value = editingData.yours.shift || '';
+            document.getElementById('mineTodo').value = editingData.mine.todo || '';
+            document.getElementById('yoursTodo').value = editingData.yours.todo || '';
 
             if (editingData.mine.status === 'working') {
                 document.getElementById('mineShiftContainer').classList.add('show');
