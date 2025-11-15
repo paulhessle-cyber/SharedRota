@@ -828,28 +828,33 @@
             });
 
             // Swipe gesture support
-            const container = document.querySelector('.container');
+            const calendarSection = document.querySelector('.calendar');
             
-            container.addEventListener('touchstart', (e) => {
+            calendarSection.addEventListener('touchstart', (e) => {
                 touchStartX = e.changedTouches[0].screenX;
-            });
+                console.log('Touch start:', touchStartX); // Debug log
+            }, { passive: true });
 
-            container.addEventListener('touchend', (e) => {
+            calendarSection.addEventListener('touchend', (e) => {
                 touchEndX = e.changedTouches[0].screenX;
+                console.log('Touch end:', touchEndX); // Debug log
                 handleSwipe();
-            });
+            }, { passive: true });
 
             function handleSwipe() {
                 const swipeThreshold = 50;
                 const diff = touchStartX - touchEndX;
+                console.log('Swipe diff:', diff); // Debug log
                 
                 if (Math.abs(diff) > swipeThreshold) {
                     if (diff > 0) {
                         // Swiped left - go to next month
+                        console.log('Next month');
                         currentDate.setMonth(currentDate.getMonth() + 1);
                         renderCalendar();
                     } else {
                         // Swiped right - go to previous month
+                        console.log('Previous month');
                         currentDate.setMonth(currentDate.getMonth() - 1);
                         renderCalendar();
                     }
@@ -928,9 +933,13 @@
 
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                // Default to 'off' for dates from March 2026 onwards
+                const defaultStatus = (year > 2026 || (year === 2026 && month >= 2)) ? 'off' : 'working';
+                
                 const dayData = rotaData[dateStr] || { 
-                    mine: { status: 'working', shift: '', todo: '' }, 
-                    yours: { status: 'working', shift: '', todo: '' } 
+                    mine: { status: defaultStatus, shift: '', todo: '' }, 
+                    yours: { status: defaultStatus, shift: '', todo: '' } 
                 };
 
                 const dayEl = document.createElement('div');
@@ -1073,9 +1082,14 @@
 
         function openModal(dateStr) {
             selectedDate = dateStr;
+            
+            // Determine default status based on date
+            const [year, month] = dateStr.split('-').map(Number);
+            const defaultStatus = (year > 2026 || (year === 2026 && month >= 3)) ? 'off' : 'working';
+            
             const dayData = rotaData[dateStr] || { 
-                mine: { status: 'working', shift: '', todo: '' }, 
-                yours: { status: 'working', shift: '', todo: '' } 
+                mine: { status: defaultStatus, shift: '', todo: '' }, 
+                yours: { status: defaultStatus, shift: '', todo: '' } 
             };
             
             editingData = JSON.parse(JSON.stringify(dayData));
