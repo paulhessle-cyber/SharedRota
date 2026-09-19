@@ -200,6 +200,15 @@ h1{
 .day.working{
     background:linear-gradient(180deg,rgba(255,255,255,.48),rgba(255,214,64,.92));
 }
+.day.shift-relief{
+    background:linear-gradient(180deg,rgba(255,255,255,.48),rgba(139,213,144,.90));
+}
+.day.shift-late{
+    background:linear-gradient(180deg,rgba(255,255,255,.48),rgba(255,158,87,.90));
+}
+.day.shift-night{
+    background:linear-gradient(180deg,rgba(255,255,255,.48),rgba(197,157,255,.90));
+}
 .day.leave{
     background:linear-gradient(180deg,rgba(255,255,255,.48),rgba(93,185,255,.72));
 }
@@ -594,6 +603,14 @@ h1{
 .preview-overdue .preview-meta{
     color:#8e97a6;
 }
+.preview-overdue .list-text{
+    text-decoration:line-through;
+    color:#7d8797;
+}
+.preview-overdue .list-date,
+.preview-overdue .list-person{
+    color:#8e97a6;
+}
 @media(max-width:600px){
     .rota-preview-stack{gap:12px;margin-top:12px}
     .preview-card{padding:17px 17px 15px}
@@ -923,9 +940,25 @@ function getDisplayDate(dateStr){
     });
 }
 
+function shiftColorClass(shift){
+    if(!shift) return "";
+    const s = shift.trim().toLowerCase();
+
+    if(s === "relief") return "shift-relief";
+
+    const startPart = s.split("-")[0];
+    const hour = parseInt(startPart,10);
+
+    if(hour === 14) return "shift-late";
+    if(hour === 18) return "shift-night";
+    return "";
+}
+
 function setDayDisplay(dayElement,statusElement,personData){
     if(personData.status === "working"){
         dayElement.classList.add("working");
+        const colorClass = shiftColorClass(personData.shift);
+        if(colorClass) dayElement.classList.add(colorClass);
         statusElement.classList.add("bold");
         statusElement.textContent = personData.shift || "Working";
     }else if(personData.status === "leave"){
@@ -1387,6 +1420,57 @@ function renderBirthdays(){
 
         list.appendChild(row);
     });
+}
+
+function openModal(key){
+    selectedDate = key;
+    const data = getDayData(key);
+    editingData = JSON.parse(JSON.stringify(data));
+
+    document.getElementById("modalHeader").textContent = getDisplayDate(key);
+
+    ["mine","yours"].forEach(function(person){
+        const info = editingData[person];
+
+        document.querySelectorAll('.toggle-btn[data-person="'+person+'"]').forEach(function(b){
+            b.classList.toggle("active",b.dataset.status === info.status);
+        });
+
+        document.getElementById(person+"ShiftContainer").classList.toggle("show",info.status === "working");
+        document.getElementById(person+"Shift").value = info.shift || "";
+        document.getElementById(person+"Todo").value = info.todo || "";
+    });
+
+    document.getElementById("modal").classList.add("show");
+}
+
+function closeModal(){
+    document.getElementById("modal").classList.remove("show");
+    selectedDate = null;
+}
+
+function saveDay(){
+    if(!selectedDate) return;
+
+    rotaOverrides[selectedDate] = {
+        mine:{
+            status:editingData.mine.status,
+            shift:editingData.mine.shift,
+            todo:editingData.mine.todo
+        },
+        yours:{
+            status:editingData.yours.status,
+            shift:editingData.yours.shift,
+            todo:editingData.yours.todo
+        }
+    };
+
+    saveData();
+    renderCalendar();
+    renderAllTodoList();
+    renderRotaTodoPreview();
+    renderRotaBirthdayPreview();
+    closeModal();
 }
 
 function showPage(pageId){
