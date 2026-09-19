@@ -511,8 +511,30 @@ h1{
 .preview-header{
     display:flex;
     align-items:center;
+    justify-content:space-between;
     gap:14px;
     margin-bottom:14px;
+}
+.preview-header-left{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    min-width:0;
+}
+.preview-add-btn{
+    flex-shrink:0;
+    width:40px;height:40px;
+    border-radius:50%;
+    border:1px solid rgba(255,255,255,.78);
+    background:rgba(255,255,255,.72);
+    box-shadow:0 6px 16px rgba(30,70,140,.12),inset 0 1px rgba(255,255,255,.9);
+    color:#2468d9;
+    font-size:22px;
+    font-weight:700;
+    display:grid;
+    place-items:center;
+    line-height:1;
+    cursor:pointer;
 }
 .preview-icon{
     width:56px;height:56px;
@@ -628,7 +650,14 @@ h1{
         <div class="header">
             <div class="header-row">
                 <h1>Rota Calendar</h1>
-                <div class="header-icon">▣</div>
+                <div class="header-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="5" width="18" height="16" rx="3"></rect>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                        <line x1="8" y1="3" x2="8" y2="7"></line>
+                        <line x1="16" y1="3" x2="16" y2="7"></line>
+                    </svg>
+                </div>
             </div>
 
             <div class="segmented">
@@ -657,8 +686,11 @@ h1{
         <div class="rota-preview-stack">
             <section class="preview-card">
                 <div class="preview-header">
-                    <div class="preview-icon">☷</div>
-                    <div class="preview-title">To Do List</div>
+                    <div class="preview-header-left">
+                        <div class="preview-icon">☷</div>
+                        <div class="preview-title">To Do List</div>
+                    </div>
+                    <button class="preview-add-btn" id="addTaskBtn" aria-label="Add task">＋</button>
                 </div>
                 <div id="rotaTodoPreview"></div>
             </section>
@@ -1148,7 +1180,7 @@ function renderRotaTodoPreview(){
 
     if(!items.length){
         container.innerHTML =
-            '<div class="preview-empty"><strong>No tasks scheduled</strong><span>Tap a day on the rota to add a task.</span></div>';
+            '<div class="preview-empty"><strong>No tasks scheduled for this month</strong><span>Tap + to add a task</span></div>';
         return;
     }
 
@@ -1549,6 +1581,11 @@ function setupEventListeners(){
 
     document.getElementById("cancelBtn").addEventListener("click",closeModal);
     document.getElementById("saveBtn").addEventListener("click",saveDay);
+
+    document.getElementById("addTaskBtn").addEventListener("click",function(){
+        openModal(dateKey(new Date()));
+        document.getElementById("mineTodo").focus();
+    });
 
     document.getElementById("modal").addEventListener("click",function(e){
         if(e.target.id === "modal") closeModal();
