@@ -243,6 +243,9 @@ h1{
 .day.both-off{
     background:linear-gradient(180deg,rgba(255,183,190,.90),rgba(255,148,160,.94));
 }
+.day.both-off-light{
+    background:linear-gradient(180deg,rgba(255,220,224,.85),rgba(255,199,204,.88));
+}
 .day-indicators{
     position:absolute;
     top:8px;right:8px;
@@ -1050,6 +1053,18 @@ function shiftColorClass(shift){
     return "";
 }
 
+function followsNightShift(dateStr){
+    const d = new Date(dateStr+"T00:00:00");
+    d.setDate(d.getDate()-1);
+    const prevData = getDayData(dateKey(d));
+
+    function isNight(personData){
+        return personData && personData.status === "working" && shiftColorClass(personData.shift) === "shift-night";
+    }
+
+    return isNight(prevData.mine) || isNight(prevData.yours);
+}
+
 function setDayDisplay(dayElement,statusElement,personData){
     if(personData.status === "working"){
         dayElement.classList.add("working");
@@ -1175,8 +1190,16 @@ function renderCalendar(){
         }else if(currentView === "yours"){
             setDayDisplay(dayEl,status,data.yours);
         }else{
-            if(data.mine.status === "off" && data.yours.status === "off"){
-                dayEl.classList.add("both-off");
+            const mineRestDay = data.mine.status === "off" || data.mine.status === "leave";
+            const yoursRestDay = data.yours.status === "off" || data.yours.status === "leave";
+
+            if(mineRestDay && yoursRestDay){
+                const isLighter =
+                    data.mine.status === "leave" ||
+                    data.yours.status === "leave" ||
+                    followsNightShift(key);
+
+                dayEl.classList.add(isLighter ? "both-off-light" : "both-off");
                 status.textContent = "Both Off";
             }else{
                 status.textContent = "-";
