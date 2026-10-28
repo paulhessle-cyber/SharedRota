@@ -249,6 +249,36 @@ h1{
 .day.both-off-light{
     background:linear-gradient(180deg,rgba(255,220,224,.85),rgba(255,199,204,.88));
 }
+.day.school-off::after{
+    content:"";
+    position:absolute;
+    left:8px;right:8px;bottom:4px;
+    height:3px;
+    border-radius:3px;
+    background:rgba(20,170,160,.55);
+}
+.school-tag{
+    position:absolute;
+    right:6px;top:9px;
+    text-align:right;
+    font-size:8.5px;
+    font-weight:650;
+    letter-spacing:.02em;
+    color:rgba(10,120,112,.9);
+    pointer-events:none;
+    white-space:nowrap;
+}
+.day-indicators ~ .school-tag{top:21px}
+.day.school-off{padding-bottom:10px}
+.school-legend{
+    display:flex;align-items:center;justify-content:center;gap:7px;
+    padding:10px 0 2px;
+    font-size:11.5px;color:#6b7488;
+}
+.school-legend i{
+    display:inline-block;width:18px;height:3px;border-radius:3px;
+    background:rgba(20,170,160,.55);
+}
 .day-indicators{
     position:absolute;
     top:8px;right:8px;
@@ -804,6 +834,7 @@ h1{
                 </div>
                 <div class="days" id="days"></div>
             </div>
+            <div class="school-legend"><i></i> School holidays &nbsp;·&nbsp; Back / Last = first &amp; last school day</div>
         </div>
 
         <div class="rota-preview-stack">
@@ -1196,6 +1227,28 @@ function birthdayDaysInMonth(year,month){
     }));
 }
 
+// ---------- SCHOOL TERM DATES (Broadacre Primary, 2026-27) ----------
+const SCHOOL_HOLIDAYS = [
+    ["2026-09-01","2026-09-08"],  // summer holiday + closed to pupils 7-8 Sep
+    ["2026-10-24","2026-11-01"],  // October half term
+    ["2026-12-19","2027-01-04"],  // Christmas (4 Jan closed to pupils)
+    ["2027-02-06","2027-02-14"],  // February half term
+    ["2027-03-20","2027-04-05"],  // Easter (5 Apr closed to pupils)
+    ["2027-05-03","2027-05-03"],  // May Day
+    ["2027-05-29","2027-06-06"],  // May half term
+    ["2027-07-24","2027-08-31"]   // summer holiday (26 Jul closed to pupils)
+];
+const SCHOOL_TAGS = {
+    "2026-09-09":"Back","2026-10-23":"Last","2026-11-02":"Back","2026-12-18":"Last",
+    "2027-01-05":"Back","2027-02-05":"Last","2027-02-15":"Back","2027-03-19":"Last",
+    "2027-04-06":"Back","2027-05-28":"Last","2027-06-07":"Back","2027-07-23":"Last",
+    "2026-09-07":"Closed","2026-09-08":"Closed","2027-01-04":"Closed","2027-04-05":"Closed",
+    "2027-05-03":"Closed","2027-07-26":"Closed"
+};
+function isSchoolHoliday(key){
+    return SCHOOL_HOLIDAYS.some(function(r){return key >= r[0] && key <= r[1];});
+}
+
 function renderCalendar(){
     const daysEl = document.getElementById("days");
     const monthYear = document.getElementById("monthYear");
@@ -1256,6 +1309,14 @@ function renderCalendar(){
             }
 
             dayEl.appendChild(indicators);
+        }
+
+        if(isSchoolHoliday(key)) dayEl.classList.add("school-off");
+        if(SCHOOL_TAGS[key]){
+            const tag = document.createElement("div");
+            tag.className = "school-tag";
+            tag.textContent = SCHOOL_TAGS[key];
+            dayEl.appendChild(tag);
         }
 
         const number = document.createElement("div");
