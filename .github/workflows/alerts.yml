@@ -1,0 +1,29 @@
+name: Daily alerts
+
+on:
+  schedule:
+    # 08:00, 09:00 and 10:00 UTC. The script only sends once a day, at or after 09:00 UK time.
+    - cron: "0 8,9,10 * * *"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Send a test alert to every phone now"
+        type: boolean
+        default: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install --prefix scripts
+      - name: Send alerts
+        run: node scripts/send-alerts.js
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          DATABASE_URL: https://shared-rota-default-rtdb.europe-west1.firebasedatabase.app
+          TEST_MODE: ${{ github.event.inputs.test }}
