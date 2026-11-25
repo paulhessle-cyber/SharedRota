@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Rota Calendar">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
 <title>Rota Calendar</title>
 
 <style>
@@ -781,6 +782,25 @@ h1{
 }
 .auth-btn:disabled{opacity:.6}
 .auth-error{min-height:20px;margin-top:10px;color:#b42318;font-size:13px;text-align:center}
+.alerts-btn{
+    display:block;
+    margin:14px auto 0;
+    padding:11px 18px;
+    border:1px solid rgba(255,255,255,.55);
+    border-radius:14px;
+    background:rgba(255,255,255,.22);
+    color:white;
+    font-size:15px;
+    font-weight:650;
+    cursor:pointer;
+}
+.alerts-status{
+    margin:8px 20px 0;
+    text-align:center;
+    color:rgba(255,255,255,.88);
+    font-size:12.5px;
+    line-height:1.35;
+}
 .signout-btn{
     display:block;
     margin:18px auto 0;
@@ -896,6 +916,8 @@ h1{
 
         <div class="glass-card list-card" id="birthdayList"></div>
         <button class="add-birthday" id="addBirthdayBtn">＋ Add Birthday</button>
+        <button class="alerts-btn" id="alertsBtn">🔔 Turn on phone alerts</button>
+        <div class="alerts-status" id="alertsStatus"></div>
         <button class="signout-btn" id="signOutBtn">Sign out</button>
     </section>
 
@@ -984,6 +1006,7 @@ h1{
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-database-compat.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-auth-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-messaging-compat.min.js"></script>
 
 <script>
 const firebaseConfig = {
@@ -1960,6 +1983,102 @@ function showAuthError(error){
         messages[error.code] || "Could not sign in. Please try again.";
 }
 
+/* =========================================================
+   PHONE ALERTS (push notifications, sent at 9am by a GitHub job)
+   ========================================================= */
+function isIOSDevice(){
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function isHomeScreenApp(){
+    return window.navigator.standalone === true ||
+        (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+}
+
+function alertsSupported(){
+    try{
+        return "serviceWorker" in navigator && "Notification" in window && "PushManager" in window &&
+            typeof firebase !== "undefined" && typeof firebase.messaging === "function" &&
+            firebase.messaging.isSupported();
+    }catch(e){
+        return false;
+    }
+}
+
+function setAlertsStatus(text){
+    const el = document.getElementById("alertsStatus");
+    if(el) el.textContent = text;
+}
+
+function updateAlertsUI(){
+    const btn = document.getElementById("alertsBtn");
+    if(!btn) return;
+
+    if(isIOSDevice() && !isHomeScreenApp()){
+        btn.textContent = "🔔 Turn on phone alerts";
+        setAlertsStatus("To get alerts on iPhone: tap Share → Add to Home Screen, then open the app from that icon and tap this button.");
+    }else if(!alertsSupported()){
+        btn.style.display = "none";
+        setAlertsStatus("Phone alerts aren't supported in this browser.");
+    }else if(Notification.permission === "granted"){
+        btn.textContent = "🔔 Alerts are on";
+        setAlertsStatus("This phone gets your to-dos and birthdays at 9am.");
+    }else if(Notification.permission === "denied"){
+        btn.textContent = "🔔 Alerts are blocked";
+        setAlertsStatus("Alerts are switched off for this app. Turn them on in Settings → Notifications.");
+    }else{
+        btn.textContent = "🔔 Turn on phone alerts";
+        setAlertsStatus("");
+    }
+}
+
+async function registerForAlerts(){
+    if(!database || !firebaseReady) throw new Error("Not signed in yet");
+    const reg = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    await navigator.serviceWorker.ready;
+    const token = await firebase.messaging().getToken({serviceWorkerRegistration:reg});
+    if(!token) throw new Error("No alert token");
+    await database.ref("pushTokens/"+token).set({
+        added:Date.now(),
+        device:navigator.userAgent.slice(0,120)
+    });
+}
+
+function setupAlerts(){
+    const btn = document.getElementById("alertsBtn");
+    if(!btn) return;
+    updateAlertsUI();
+
+    btn.addEventListener("click",async function(){
+        if(isIOSDevice() && !isHomeScreenApp()){
+            updateAlertsUI();
+            return;
+        }
+        if(!alertsSupported()) return;
+
+        try{
+            const result = await Notification.requestPermission();
+            if(result === "granted"){
+                setAlertsStatus("Setting up…");
+                await registerForAlerts();
+            }
+        }catch(error){
+            console.error("Alerts error:",error);
+            setAlertsStatus("Couldn't turn on alerts. Check you're signed in and try again.");
+            return;
+        }
+        updateAlertsUI();
+    });
+}
+
+/* Re-register quietly each time the app opens, so the phone's alert token stays current. */
+function refreshAlerts(){
+    if(alertsSupported() && Notification.permission === "granted"){
+        registerForAlerts().catch(function(e){ console.warn("Alert refresh:",e); });
+    }
+}
+
 function setupAuth(){
     const overlay = document.getElementById("authOverlay");
     const submit = document.getElementById("authSubmit");
@@ -1986,6 +2105,7 @@ function setupAuth(){
             overlay.classList.remove("show");
             document.getElementById("authPassword").value = "";
             firebaseReady = true;
+            refreshAlerts();
 
             if(!listenersStarted){
                 listenersStarted = true;
@@ -2002,6 +2122,7 @@ function setupAuth(){
 
 window.addEventListener("load",function(){
     setupEventListeners();
+    setupAlerts();
 
     let authEnabled = false;
 
